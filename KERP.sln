@@ -1,0 +1,52 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.12.35527.113 d17.12
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KERP.BlazorUI", "src\KERP.BlazorUI\KERP.BlazorUI.csproj", "{DE68C01F-6FC2-418E-8A1F-EA02BC52C20F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KERP.Domain", "src\KERP.Domain\KERP.Domain.csproj", "{7A35FABD-662B-425C-8B5E-CD08816D731F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KERP.Application", "src\KERP.Application\KERP.Application.csproj", "{628D835B-7176-4C7D-8882-D57E0DFA6843}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KERP.Infrastructure", "src\KERP.Infrastructure\KERP.Infrastructure.csproj", "{E248606A-BFC4-4C00-9A0D-CFB27162FC87}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KERP.UnitTests", "tests\KERP.UnitTests\KERP.UnitTests.csproj", "{61FE5A8B-7B0A-42E2-9F42-1618023B9B93}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KERP.API", "src\KERP.API\KERP.API.csproj", "{D9029153-7617-41F6-8D79-D70D37981EC6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{DE68C01F-6FC2-418E-8A1F-EA02BC52C20F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{DE68C01F-6FC2-418E-8A1F-EA02BC52C20F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{DE68C01F-6FC2-418E-8A1F-EA02BC52C20F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{DE68C01F-6FC2-418E-8A1F-EA02BC52C20F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7A35FABD-662B-425C-8B5E-CD08816D731F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A35FABD-662B-425C-8B5E-CD08816D731F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A35FABD-662B-425C-8B5E-CD08816D731F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A35FABD-662B-425C-8B5E-CD08816D731F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{628D835B-7176-4C7D-8882-D57E0DFA6843}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{628D835B-7176-4C7D-8882-D57E0DFA6843}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{628D835B-7176-4C7D-8882-D57E0DFA6843}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{628D835B-7176-4C7D-8882-D57E0DFA6843}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E248606A-BFC4-4C00-9A0D-CFB27162FC87}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E248606A-BFC4-4C00-9A0D-CFB27162FC87}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E248606A-BFC4-4C00-9A0D-CFB27162FC87}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E248606A-BFC4-4C00-9A0D-CFB27162FC87}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61FE5A8B-7B0A-42E2-9F42-1618023B9B93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61FE5A8B-7B0A-42E2-9F42-1618023B9B93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61FE5A8B-7B0A-42E2-9F42-1618023B9B93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61FE5A8B-7B0A-42E2-9F42-1618023B9B93}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D9029153-7617-41F6-8D79-D70D37981EC6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D9029153-7617-41F6-8D79-D70D37981EC6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D9029153-7617-41F6-8D79-D70D37981EC6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D9029153-7617-41F6-8D79-D70D37981EC6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
