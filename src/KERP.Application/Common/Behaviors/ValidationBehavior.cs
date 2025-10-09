@@ -4,46 +4,150 @@ using KERP.Application.Validation;
 
 namespace KERP.Application.Common.Behaviors;
 
-/// <summary>
-/// Behavior (dekorator) odpowiedzialny za uruchamianie walidacji dla komend.
-/// Zatrzymuje przetwarzanie, jeśli walidacja wejściowa zakończyla się niepowodzeniem.
-/// </summary>
-public class ValidationBehavior<TCommand, TResult> : ICommandHandler<TCommand, TResult>
-    where TCommand : ICommand<TResult>
-    where TResult : Result
+public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TResponse : Result
 {
-    private readonly ICommandHandler<TCommand, TResult> _decorated;
-    private readonly IEnumerable<IValidator<TCommand>> _validators;
+    private readonly IEnumerable<IValidator<TRequest>> _validators;
 
-    public ValidationBehavior(
-        ICommandHandler<TCommand, TResult> decorated,
-        IEnumerable<IValidator<TCommand>> validators)
+    /// <summary>
+    /// Inicjalizuje nową instancję ValidationBehavior.
+    /// </summary>
+    /// <param name="validators">
+    /// Kolekcja wszystkich walidatorów dla typu TRequest.
+    /// DI automatycznie wstrzyknie wszystkie zarejestrowane walidatory.
+    /// Jeśli nie ma walidatorów, kolekcja będzie pusta (nie null).
+    /// </param>
+    public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators)
     {
-        _decorated = decorated;
-        _validators = validators;
+        _validators = validators ?? throw new ArgumentNullException(nameof(validators));
     }
 
-    public async Task<TResult> Handle(TCommand command, CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task<TResponse> HandleAsync(
+        TRequest request,
+        Func<Task<TResponse>> next,
+        CancellationToken cancellationToken = default)
     {
-        if (!_validators.Any())
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 1: Sprawdź czy to jest Command (warunkowe stosowanie)
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        // Jeśli to NIE jest Command, pomiń walidację i wywołaj next()
+        if (request is not ICommand)
         {
-            return await _decorated.Handle(command, cancellationToken);
+            // To jest Query - nie walidujemy
+            return await next();
         }
 
-        var validationResults = await Task.WhenAll(
-            _validators.Select(v => v.ValidateAsync(command, cancellationToken))
-        );
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 2: Sprawdź czy są jakieś walidatory zarejestrowane
+        // ═══════════════════════════════════════════════════════════════════════════════
 
-        var errors = validationResults.SelectMany(r => r.Errors).ToList();
+        // Jeśli nie ma walidatorów, od razu wywołaj next()
+        // (oszczędność - nie wykonujemy pustej pętli)
+        if (!_validators.Any())
+        {
+            return await next();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 3: Uruchom wszystkie walidatory równolegle
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        // Task.WhenAll wykonuje wszystkie walidatory jednocześnie
+        // To jest szybsze niż wykonywanie ich po kolei
+        var validationTasks = _validators
+            .Select(validator => validator.ValidateAsync(request, cancellationToken));
+
+        var validationResults = await Task.WhenAll(validationTasks);
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 4: Zbierz wszystkie błędy z wszystkich walidatorów
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        // SelectMany "spłaszcza" listy błędów z wielu walidatorów w jedną listę
+        // Przykład:
+        // Validator1.Errors = [Error1, Error2]
+        // Validator2.Errors = [Error3]
+        // SelectMany → [Error1, Error2, Error3]
+        var errors = validationResults
+            .SelectMany(result => result.Errors)
+            .ToList();
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 5: Jeśli są błędy, PRZERWIJ PIPELINE i zwróć Result.Failure
+        // ═══════════════════════════════════════════════════════════════════════════════
 
         if (errors.Any())
         {
+            // Konwertuj ValidationError (z walidatorów) na Error (z Result pattern)
             var resultErrors = errors
-                .Select(e => new Error("ValidationError", e.ErrorMessage, ErrorType.Critical)).ToList();
+                .Select(validationError => new Error(
+                    Code: "ValidationError",
+                    Description: validationError.ErrorMessage,
+                    Type: ErrorType.Critical))
+                .ToList();
 
-            return Result.CreateFailure<TResult>(resultErrors);
+            // ⚠️ WAŻNE: NIE wywołujemy next() - pipeline jest przerwany!
+            // Handler się nie wykona, transakcja nie zostanie rozpoczęta.
+            return CreateFailureResult(resultErrors);
         }
 
-        return await _decorated.Handle(command, cancellationToken);
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 6: Walidacja OK - wywołaj następny behavior/handler
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        return await next();
     }
+
+    /// <summary>
+    /// Tworzy Result.Failure dla typu TResponse.
+    /// </summary>
+    /// <remarks>
+    /// Ta metoda jest identyczna jak w ExceptionHandlingBehavior.
+    /// W idealnym świecie, byłaby w osobnej klasie pomocniczej (np. ResultFactory).
+    /// </remarks>
+    private static TResponse CreateFailureResult(IReadOnlyCollection<Error> errors)
+    {
+        var responseType = typeof(TResponse);
+
+        if (responseType == typeof(Result))
+        {
+            var result = Result.Failure(errors);
+            return (TResponse)(object)result;
+        }
+
+        if (responseType.IsGenericType &&
+            responseType.GetGenericTypeDefinition() == typeof(Result<>))
+        {
+            var valueType = responseType.GetGenericArguments()[0];
+            var resultType = typeof(Result<>).MakeGenericType(valueType);
+            var failureMethod = resultType.GetMethod(
+                "Failure",
+                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
+                null,
+                new[] { typeof(IReadOnlyCollection<Error>) },
+                null);
+
+            if (failureMethod == null)
+            {
+                throw new InvalidOperationException(
+                    $"Could not find Failure method on type {resultType.Name}.");
+            }
+
+            var result = failureMethod.Invoke(null, new object[] { errors });
+
+            if (result == null)
+            {
+                throw new InvalidOperationException(
+                    $"Failure method on {resultType.Name} returned null.");
+            }
+
+            return (TResponse)result;
+        }
+
+        throw new InvalidOperationException(
+            $"Unsupported result type: {responseType.Name}.");
+    }
+
 }

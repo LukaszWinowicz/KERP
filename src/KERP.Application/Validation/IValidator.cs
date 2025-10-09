@@ -3,10 +3,17 @@
 namespace KERP.Application.Validation;
 
 /// <summary>
-/// Definiuje walidatora dla komendy.
+/// Definiuje walidatora dla requestu (Command lub Query).
 /// </summary>
-/// <typeparam name="TCommand">Typ komendy do walidacji.</typeparam>
-public interface IValidator<in TCommand> where TCommand : ICommand
+/// <typeparam name="TRequest">Typ requestu do walidacji (zazwyczaj Command).</typeparam>
+public interface IValidator<in TRequest>
 {
-    Task<ValidationResult> ValidateAsync(TCommand command, CancellationToken cancellationToken);
+    /// <summary>
+    /// Asynchronicznie waliduje request.
+    /// </summary>
+    /// <param name="request">Request do walidacji (Command lub Query).</param>
+    /// <param name="cancellationToken">Token anulowania operacji.</param>
+    /// <returns>Rezultat walidacji zawierający listę błędów (jeśli są).</returns>
+    Task<ValidationResult> ValidateAsync(TRequest request, CancellationToken cancellationToken);
 }
+

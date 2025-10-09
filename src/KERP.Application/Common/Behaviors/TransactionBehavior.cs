@@ -4,62 +4,140 @@ using Microsoft.Extensions.Logging;
 
 namespace KERP.Application.Common.Behaviors;
 
-/// <summary>
-/// Behavior (dekorator) odpowiedzalny za zarządzanie transakcjami bazowymi.
-/// Używa standardowego mechanizmu transakcji z EF Core.
-/// </summary>
-public class TransactionBehavior<TCommadn, TResult> : ICommandHandler<TCommadn, TResult>
-    where TCommadn : ICommand<TResult>
-    where TResult : Result
+public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TResponse : Result
 {
-    private readonly ICommandHandler<TCommadn, TResult> _decorated;
     private readonly IAppDbContext _dbContext;
-    private readonly ILogger<TransactionBehavior<TCommadn, TResult>> _logger;
+    private readonly ILogger<TransactionBehavior<TRequest, TResponse>> _logger;
+
+    /// <summary>
+    /// Inicjalizuje nową instancję TransactionBehavior.
+    /// </summary>
+    /// <param name="dbContext">Kontekst bazy danych używany do zarządzania transakcją.</param>
+    /// <param name="logger">Logger do zapisywania informacji o transakcjach.</param>
     public TransactionBehavior(
-        ICommandHandler<TCommadn, TResult> decorated,
         IAppDbContext dbContext,
-        ILogger<TransactionBehavior<TCommadn, TResult>> logger)
+        ILogger<TransactionBehavior<TRequest, TResponse>> logger)
     {
-        _decorated = decorated;
-        _dbContext = dbContext;
-        _logger = logger;
+        _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
-    public async Task<TResult> Handle(TCommadn command, CancellationToken cancellationToken)
+
+    /// <inheritdoc />
+    public async Task<TResponse> HandleAsync(
+        TRequest request,
+        Func<Task<TResponse>> next,
+        CancellationToken cancellationToken = default)
     {
-        // Rozpoczęcie transakcji na poziomie bazy danych
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 1: Sprawdź czy to jest Command (warunkowe stosowanie)
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        // Jeśli to NIE jest Command, pomiń transakcję i wywołaj next()
+        if (request is not ICommand)
+        {
+            // To jest Query - operacje read-only nie potrzebują transakcji
+            return await next();
+        }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // KROK 2: Rozpocznij transakcję bazodanową
+        // ═══════════════════════════════════════════════════════════════════════════════
+
+        var requestName = typeof(TRequest).Name;
+
+        // await using zapewnia że transakcja zostanie zdisposowana
+        // (nawet jeśli wystąpi wyjątek)
         await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
-        _logger.LogInformation("Rozpoczęto transakcję dla komendy {CommandName}", typeof(TCommadn).Name);
+
+        _logger.LogInformation(
+            "Started database transaction for request {RequestName}",
+            requestName);
 
         try
         {
-            // Wywołuje następne ogniwo (czyli właściwy CommandHandler)
-            var result = await _decorated.Handle(command, cancellationToken);
+            // ═══════════════════════════════════════════════════════════════════════════
+            // KROK 3: Wywołaj następny behavior/handler
+            // ═══════════════════════════════════════════════════════════════════════════
 
-            // Transakcja jest zatwierdzona tylko wtedy, gdy wewnętrzny handler zwrócił sukces.
-            if (result.IsSuccess)
+            // Handler wykonuje się w kontekście transakcji
+            // Wszystkie zmiany są śledzone przez EF Core, ale jeszcze nie zapisane
+            var response = await next();
+
+            // ═══════════════════════════════════════════════════════════════════════════
+            // KROK 4: Sprawdź rezultat i zdecyduj: Commit czy Rollback
+            // ═══════════════════════════════════════════════════════════════════════════
+
+            if (response.IsSuccess)
             {
-                // Zatwierdzenie transakcji, jeśli operacja w handlerze zakończyła się sukcesem.
+                // ───────────────────────────────────────────────────────────────────────
+                // SUKCES - Commit transakcji
+                // ───────────────────────────────────────────────────────────────────────
+
                 await transaction.CommitAsync(cancellationToken);
-                _logger.LogInformation("Transakcja dla komendy {CommandName} została zatwierdzona (commit).", typeof(TCommadn).Name);
+
+                _logger.LogInformation(
+                    "Committed database transaction for request {RequestName}",
+                    requestName);
             }
             else
             {
-                // Jeśli handler zwróci błąd (Result.Failure), ale nie wyrzuci wyjątku,
-                // to transakcja jest wycofywana aby nie zapisać częściowo danych.           
+                // ───────────────────────────────────────────────────────────────────────
+                // PORAŻKA - Rollback transakcji
+                // ───────────────────────────────────────────────────────────────────────
+
+                // Result.IsFailure = true oznacza błąd biznesowy/walidacyjny
+                // Nie chcemy zapisywać częściowych zmian
                 await transaction.RollbackAsync(cancellationToken);
-                _logger.LogWarning("Transakcja dla komendy {CommandName} została wycofana (rollback) z powodu błędu: {Errors}",
-                                    typeof(TCommadn).Name, string.Join(", ", result.Errors.Select(e => e.Description)));
+
+                var errorCodes = string.Join(", ", response.Errors.Select(e => e.Code));
+
+                _logger.LogWarning(
+                    "Rolled back database transaction for request {RequestName} due to failure: {ErrorCodes}",
+                    requestName,
+                    errorCodes);
             }
-            return result;
+
+            return response;
         }
         catch (Exception ex)
         {
-            // Jeśli w trakcie operacji wystąpił jakikolwiek wyjątek, wycofujemy transakcję i logujemy błąd.
-            _logger.LogError(ex, "Wystąpił błąd podczas przetwarzania komendy {CommandName}", typeof(TCommadn).Name);
-            await transaction.RollbackAsync(cancellationToken);
+            // ═══════════════════════════════════════════════════════════════════════════
+            // KROK 5: Obsługa wyjątku - Rollback i propaguj
+            // ═══════════════════════════════════════════════════════════════════════════
 
-            // Rzucamy wyjątek dalej, aby został złapany przez ExceptionHandlingBehavior.
+            // Wyjątek oznacza nieoczekiwany błąd (np. SqlException, NullReferenceException)
+            // Musimy wycofać transakcję aby nie zapisać częściowych zmian
+
+            _logger.LogError(
+                ex,
+                "Rolling back database transaction for request {RequestName} due to exception",
+                requestName);
+
+            // Rollback transakcji
+            // Użycie try-catch aby nie ukryć oryginalnego wyjątku
+            try
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+            catch (Exception rollbackEx)
+            {
+                // Rollback sam rzucił wyjątek (bardzo rzadkie)
+                // Logujemy, ale propagujemy oryginalny wyjątek (ex), nie rollbackEx
+                _logger.LogError(
+                    rollbackEx,
+                    "Failed to rollback transaction for request {RequestName}",
+                    requestName);
+            }
+
+            // Propaguj oryginalny wyjątek dalej
+            // ExceptionHandlingBehavior go złapie i przekonwertuje na Result.Failure
             throw;
         }
+
+        // ═══════════════════════════════════════════════════════════════════════════════
+        // UWAGA: await using transaction zapewnia że transaction.Dispose() zostanie wywołane
+        // nawet jeśli wystąpi wyjątek (cleanup zasobów)
+        // ═══════════════════════════════════════════════════════════════════════════════
     }
 }

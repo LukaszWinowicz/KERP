@@ -1,49 +1,98 @@
 ﻿using KERP.Application.Common.Abstractions;
 using KERP.Application.Common.Models;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 namespace KERP.Application.Common.Behaviors;
 
-// Używamy generyków, aby ten behavior mógł obsłużyć dowolną komendę
-public class LoggingBehavior<TCommand, TResult> : ICommandHandler<TCommand, TResult>
-    where TCommand : ICommand<TResult>
-    where TResult : Result
+public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+    where TResponse : class
 {
-    private readonly ICommandHandler<TCommand, TResult> _decorated;
-    private readonly ILogger<LoggingBehavior<TCommand, TResult>> _logger;
+    private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;
 
-    public LoggingBehavior(
-        ICommandHandler<TCommand, TResult> decorated,
-        ILogger<LoggingBehavior<TCommand, TResult>> logger)
+    /// <summary>
+    /// Inicjalizuje nową instancję LoggingBehavior.
+    /// </summary>
+    /// <param name="logger">Logger do zapisywania informacji o requestach.</param>
+    public LoggingBehavior(ILogger<LoggingBehavior<TRequest, TResponse>> logger)
     {
-        _decorated = decorated;
         _logger = logger;
     }
 
-    public async Task<TResult> Handle(TCommand command, CancellationToken cancellationToken)
+    /// <inheritdoc />
+    public async Task<TResponse> HandleAsync(
+        TRequest request,
+        Func<Task<TResponse>> next,
+        CancellationToken cancellationToken = default)
     {
-        var commandName = command.GetType().Name;
+        // PRZED wykonaniem requestu - Log rozpoczęcia.
+        var requestName = typeof(TRequest).Name;
 
-        // Logowanie rozpoczęcia z użyciem parametrów do logania strukturalnego.
-        _logger.LogInformation("Rozpoczęcie obsługi komendy {CommandName}", commandName);
+        _logger.LogInformation(
+            "Starting request: {RequestName}",
+            requestName);
 
-        // Wywołanie następnego ogniwa w potoku.
-        var result = await _decorated.Handle(command, cancellationToken);
+        // Rozpocznij mierzenie czasu
+        var stopwatch = Stopwatch.StartNew();
 
-        // Analiza wyników i odpowiednie logowanie.
-        if (result.IsSuccess)
+        try
         {
-            _logger.LogInformation("Pomyślnie zakończono obsługę komendy {CommandName}", commandName);
-            return result;
+            // Wywołaj następny behavior lub handler
+            var response = await next();
+
+            // Po wykonaniu requestu - Log zakończenia
+            stopwatch.Stop();
+
+            // Sprawdź czy response to Result (aby wyciągnąć informacje o sukcesie/błędach)
+            if (response is Result result)
+            {
+                if (result.IsSuccess)
+                {
+                    // Sukces - loguj jako Information
+                    _logger.LogInformation(
+                        "Completed request: {RequestName} in {ElapsedMilliseconds}ms (Success)",
+                        requestName,
+                        stopwatch.ElapsedMilliseconds);
+                }
+                else
+                {
+                    // Błąd (np. walidacja) - loguj jako Warning z kodami błędów
+                    var errorCodes = string.Join(", ", result.Errors.Select(e => e.Code));
+
+                    _logger.LogWarning(
+                        "Completed request: {RequestName} in {ElapsedMilliseconds}ms (Failure: {ErrorCodes})",
+                        requestName,
+                        stopwatch.ElapsedMilliseconds,
+                        errorCodes);
+                }
+            }
+            else
+            {
+                // Response nie jest Result - loguj po prostu sukces
+                _logger.LogInformation(
+                    "Completed request: {RequestName} in {ElapsedMilliseconds}ms",
+                    requestName,
+                    stopwatch.ElapsedMilliseconds);
+            }
+
+            return response;
+
         }
-        else
+        catch (Exception ex)
         {
-            // Jeśli operacja zawidoła (np. błąd walidacji), logujemy to jako ostrzeżenie.
-            // Łączymy błędy w jeden string dla czytelności logu.
-            var errorsText = string.Join(" | ", result.Errors.Select(e => $"{e.Code}: {e.Description}"));
-            _logger.LogWarning("Obsługa komendy {CommandName} zakończona błędem: {Errors}", commandName, errorsText);
+
+            // Wyjątek (nieoczekiwany błąd) - Log jako Error
+
+            stopwatch.Stop();
+
+            _logger.LogError(
+                ex,
+                "Request {RequestName} failed after {ElapsedMilliseconds}ms with exception",
+                requestName,
+                stopwatch.ElapsedMilliseconds);
+
+            // Propaguj wyjątek dalej - zostanie złapany przez ExceptionHandlingBehavior
+            throw;
         }
 
-        // Zwracamy wynik, nawet jeśli jest błędny, aby umożliwić dalsze przetwarzanie.
-        return result;
     }
 }
