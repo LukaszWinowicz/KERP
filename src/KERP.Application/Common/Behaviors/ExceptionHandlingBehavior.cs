@@ -6,14 +6,17 @@ using System.Reflection;
 
 namespace KERP.Application.Common.Behaviors;
 
-//// <summary>
+/// <summary>
 /// Pipeline behavior odpowiedzialny za przechwytywanie i obsługę wyjątków.
 /// Konwertuje wyjątki na Result.Failure, zapewniając spójną obsługę błędów w całym systemie.
+/// Implementuje zarówno ICommandPipelineBehavior jak i IQueryPipelineBehavior.
 /// </summary>
-/// <typeparam name="TRequest"></typeparam>
-/// <typeparam name="TResponse"></typeparam>
-public class ExceptionHandlingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
-    where TResponse : class
+/// <typeparam name="TRequest">Typ requestu (Command lub Query).</typeparam>
+/// <typeparam name="TResponse">Typ odpowiedzi (Result lub Result&lt;T&gt;).</typeparam>
+public class ExceptionHandlingBehavior<TRequest, TResponse>
+    : ICommandPipelineBehavior<TRequest, TResponse>,
+      IQueryPipelineBehavior<TRequest, TResponse>
+    where TResponse : Result
 
 {
     private readonly ILogger<ExceptionHandlingBehavior<TRequest, TResponse>> _logger;

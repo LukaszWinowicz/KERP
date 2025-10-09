@@ -4,7 +4,16 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 namespace KERP.Application.Common.Behaviors;
 
-public class LoggingBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+/// <summary>
+/// Pipeline behavior odpowiedzialny za logowanie rozpoczęcia i zakończenia requestów.
+/// Implementuje zarówno ICommandPipelineBehavior jak i IQueryPipelineBehavior,
+/// dzięki czemu może być użyty w obu pipeline'ach bez duplikacji kodu.
+/// </summary>
+/// <typeparam name="TRequest">Typ requestu (Command lub Query).</typeparam>
+/// <typeparam name="TResponse">Typ odpowiedzi (Result lub Result&lt;T&gt;).</typeparam>
+public class LoggingBehavior<TRequest, TResponse> : 
+    ICommandPipelineBehavior<TRequest, TResponse>,
+    IQueryPipelineBehavior<TRequest, TResponse>
     where TResponse : class
 {
     private readonly ILogger<LoggingBehavior<TRequest, TResponse>> _logger;

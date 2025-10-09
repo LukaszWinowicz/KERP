@@ -47,7 +47,7 @@ public sealed class Mediator : IMediator
         // GetServices<T>() zwraca IEnumerable<T> - wszystkie zarejestrowane implementacje
         // Kolejność jest określona przez kolejność rejestracji w DI
         var behaviors = _serviceProvider
-            .GetServices<IPipelineBehavior<TCommand, TResult>>()
+            .GetServices<ICommandPipelineBehavior<TCommand, TResult>>()
             .ToList(); // ToList() aby zmaterializować kolekcję
 
         // KROK 4: Build pipeline - budowanie łańucha wywołań.
@@ -100,7 +100,7 @@ public sealed class Mediator : IMediator
         // - Command: Logging, Validation, Transaction, Exception
         // - Query: Logging, Cache, Exception
         var behaviors = _serviceProvider
-            .GetServices<IPipelineBehavior<TQuery, TResult>>()
+            .GetServices<IQueryPipelineBehavior<TQuery, TResult>>()
             .ToList();
 
         // KROK 4: Build pipeline

@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace KERP.Application.Common.Behaviors;
 
-public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+public class TransactionBehavior<TRequest, TResponse> : ICommandPipelineBehavior<TRequest, TResponse>
     where TResponse : Result
 {
     private readonly IAppDbContext _dbContext;
@@ -30,18 +30,7 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
         CancellationToken cancellationToken = default)
     {
         // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 1: Sprawdź czy to jest Command (warunkowe stosowanie)
-        // ═══════════════════════════════════════════════════════════════════════════════
-
-        // Jeśli to NIE jest Command, pomiń transakcję i wywołaj next()
-        if (request is not ICommand)
-        {
-            // To jest Query - operacje read-only nie potrzebują transakcji
-            return await next();
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 2: Rozpocznij transakcję bazodanową
+        // KROK 1: Rozpocznij transakcję bazodanową
         // ═══════════════════════════════════════════════════════════════════════════════
 
         var requestName = typeof(TRequest).Name;
@@ -57,7 +46,7 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
         try
         {
             // ═══════════════════════════════════════════════════════════════════════════
-            // KROK 3: Wywołaj następny behavior/handler
+            // KROK 2: Wywołaj następny behavior/handler
             // ═══════════════════════════════════════════════════════════════════════════
 
             // Handler wykonuje się w kontekście transakcji
@@ -65,7 +54,7 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
             var response = await next();
 
             // ═══════════════════════════════════════════════════════════════════════════
-            // KROK 4: Sprawdź rezultat i zdecyduj: Commit czy Rollback
+            // KROK 3: Sprawdź rezultat i zdecyduj: Commit czy Rollback
             // ═══════════════════════════════════════════════════════════════════════════
 
             if (response.IsSuccess)
@@ -103,7 +92,7 @@ public class TransactionBehavior<TRequest, TResponse> : IPipelineBehavior<TReque
         catch (Exception ex)
         {
             // ═══════════════════════════════════════════════════════════════════════════
-            // KROK 5: Obsługa wyjątku - Rollback i propaguj
+            // KROK 4: Obsługa wyjątku - Rollback i propaguj
             // ═══════════════════════════════════════════════════════════════════════════
 
             // Wyjątek oznacza nieoczekiwany błąd (np. SqlException, NullReferenceException)

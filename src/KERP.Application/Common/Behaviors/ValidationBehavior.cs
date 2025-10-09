@@ -4,7 +4,7 @@ using KERP.Application.Validation;
 
 namespace KERP.Application.Common.Behaviors;
 
-public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<TRequest, TResponse>
     where TResponse : Result
 {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
@@ -29,18 +29,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
         CancellationToken cancellationToken = default)
     {
         // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 1: Sprawdź czy to jest Command (warunkowe stosowanie)
-        // ═══════════════════════════════════════════════════════════════════════════════
-
-        // Jeśli to NIE jest Command, pomiń walidację i wywołaj next()
-        if (request is not ICommand)
-        {
-            // To jest Query - nie walidujemy
-            return await next();
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 2: Sprawdź czy są jakieś walidatory zarejestrowane
+        // KROK 1: Sprawdź czy są jakieś walidatory zarejestrowane
         // ═══════════════════════════════════════════════════════════════════════════════
 
         // Jeśli nie ma walidatorów, od razu wywołaj next()
@@ -51,7 +40,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
         }
 
         // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 3: Uruchom wszystkie walidatory równolegle
+        // KROK 2: Uruchom wszystkie walidatory równolegle
         // ═══════════════════════════════════════════════════════════════════════════════
 
         // Task.WhenAll wykonuje wszystkie walidatory jednocześnie
@@ -62,7 +51,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
         var validationResults = await Task.WhenAll(validationTasks);
 
         // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 4: Zbierz wszystkie błędy z wszystkich walidatorów
+        // KROK 3: Zbierz wszystkie błędy z wszystkich walidatorów
         // ═══════════════════════════════════════════════════════════════════════════════
 
         // SelectMany "spłaszcza" listy błędów z wielu walidatorów w jedną listę
@@ -75,7 +64,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
             .ToList();
 
         // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 5: Jeśli są błędy, PRZERWIJ PIPELINE i zwróć Result.Failure
+        // KROK 4: Jeśli są błędy, PRZERWIJ PIPELINE i zwróć Result.Failure
         // ═══════════════════════════════════════════════════════════════════════════════
 
         if (errors.Any())
@@ -94,7 +83,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
         }
 
         // ═══════════════════════════════════════════════════════════════════════════════
-        // KROK 6: Walidacja OK - wywołaj następny behavior/handler
+        // KROK 5: Walidacja OK - wywołaj następny behavior/handler
         // ═══════════════════════════════════════════════════════════════════════════════
 
         return await next();
