@@ -1,4 +1,4 @@
-using KERP.BlazorUI.Components;
+ï»¿using KERP.BlazorUI.Components;
 using Microsoft.FluentUI.AspNetCore.Components;
 using KERP.Application;
 using KERP.Infrastructure;
@@ -6,7 +6,7 @@ using Serilog;
 
 // Konfiguracja Seriloga
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning) // Ustawienie minimalnego poziomu logowania dla Microsoft (ukrywa szym z logów systemowych)
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning) // Ustawienie minimalnego poziomu logowania dla Microsoft (ukrywa szym z logÃ³w systemowych)
     .Enrich.FromLogContext() // Kluczowe dla Correlation ID
     .WriteTo.Console() // Kieruje logi do konsoli
     .CreateLogger();
@@ -48,9 +48,9 @@ try
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Aplikacja nie mog³a siê uruchomiæ");
+    Log.Fatal(ex, "Aplikacja nie mogÅ¼a siÄ™ uruchomiÄ‡.");
 }
 finally
 {
-    Log.CloseAndFlush(); // Upewnij siê, ¿e wszystkie logi s¹ zapisane przed zakoñczeniem aplikacji
+    Log.CloseAndFlush(); // Upewnij siÃª, Â¿e wszystkie logi sÂ¹ zapisane przed zakoÃ±czeniem aplikacji
 }

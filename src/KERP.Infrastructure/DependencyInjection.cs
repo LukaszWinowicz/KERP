@@ -14,7 +14,7 @@ public static class DependencyInjection
     {
         // Rejestracja DbContext
         services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString("DefaultConnection")));
+            options.UseSqlServer(configuration.GetConnectionString("DefaultConnection")));
 
         // Mówimy kontenerowi, że interfejs IAppDbContext jest realizowany przez klasę AppDbContext.
         // On sam zrozumie, żeby użyć tej samej instancji, co dla wstrzyknięcia samego AppDbContext.
