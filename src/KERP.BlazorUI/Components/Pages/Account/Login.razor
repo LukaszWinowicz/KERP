@@ -1,9 +1,10 @@
 ﻿@page "/Account/Login"
 @using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Identity
 @using KERP.Domain.Aggregates.User
-@inject SignInManager<ApplicationUser> SignInManager
 @inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider AuthenticationStateProvider
 
 <PageTitle>Sign in - KERP</PageTitle>
 
@@ -22,19 +23,11 @@
         <div class="external-login-section">
             <form method="post" action="/Account/ExternalLogin?provider=Google&returnUrl=@ReturnUrl">
                 <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Style="width: 100%;">
-                    <FluentIcon Value="@(new Icons.Filled.Size24.PersonAccounts())" Slot="start" />
                     Sign in with Google
                 </FluentButton>
             </form>
         </div>
 
-        <div class="divider">
-            <span>or</span>
-        </div>
-
-        <div class="local-login-section">
-            <p class="info-text">Email/Password login coming soon...</p>
-        </div>
     </FluentCard>
 </div>
 
@@ -68,30 +61,6 @@
         margin-bottom: 24px;
     }
 
-    .divider {
-        display: flex;
-        align-items: center;
-        text-align: center;
-        margin: 24px 0;
-    }
-
-    .divider::before,
-    .divider::after {
-        content: '';
-        flex: 1;
-        border-bottom: 1px solid var(--neutral-stroke-divider-rest);
-    }
-
-    .divider span {
-        padding: 0 12px;
-        color: var(--neutral-foreground-hint);
-        font-size: 14px;
-    }
-
-    .local-login-section {
-        text-align: center;
-    }
-
     .info-text {
         color: var(--neutral-foreground-hint);
         font-size: 14px;
@@ -106,12 +75,15 @@
     [SupplyParameterFromQuery]
     public string? ErrorMessage { get; set; }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        // Jeśli użytkownik jest już zalogowany, przekieruj do strony głównej
-        if (SignInManager.IsSignedIn(new System.Security.Claims.ClaimsPrincipal()))
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
         {
             NavigationManager.NavigateTo(ReturnUrl ?? "/");
         }
     }
 }
+

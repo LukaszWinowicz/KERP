@@ -1,0 +1,94 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+@inject NavigationManager NavigationManager
+
+<FluentHeader>
+    KERP
+    <FluentSpacer />
+    <AuthorizeView>
+        <Authorized>
+            <div class="centered-badge">
+                <FluentCounterBadge BackgroundColor="@Color.Error"
+                                    Color="Color.Fill"                                  
+                                    ShowCount="false">
+                    <FluentIcon Value="@(new Icons.Regular.Size24.Alert())"
+                                Color="@Color.Fill"
+                                Class="alert-icon"
+                                />
+                </FluentCounterBadge>
+            </div>
+            <FluentSpacer Width="15" />
+            @* <form method="post" action="signout-google"> *@
+                <form method="post" action="/Account/Logout">
+
+                <FluentProfileMenu Initials="@GenerateInitials(Username)"
+                                   FullName="@Username"
+                                   EMail="@Email"
+                                   OnHeaderButtonClick="@SignOutAsync">
+                    <FooterTemplate>
+                        <FluentStack></FluentStack>
+                    </FooterTemplate>
+                </FluentProfileMenu>
+            </form>
+        </Authorized>
+    </AuthorizeView>
+</FluentHeader>
+
+<style>
+    .alert-icon {
+        cursor: pointer;
+    }
+
+        .alert-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .alert-icon:active {
+            transform: scale(0.95);
+        }
+
+    .centered-badge {
+        display: flex;
+        align-items: center;
+        height: 60%;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string Username { get; set; } = string.Empty;
+    private string Email { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState != null)
+        {
+            var authState = await AuthState;
+            Username = authState.User.Claims.FirstOrDefault(x => x.Type == "GivenUsername")?.Value ?? string.Empty;
+            Email = authState.User.Claims.FirstOrDefault(x => x.Type == "GivenEmail")?.Value ?? string.Empty;
+        }
+    }
+
+    /// <summary>
+    /// Obsługa zmian w notyfikacjach - odświeża komponent
+    /// </summary>
+    private void HandleNotificationsChanged()
+    {
+        InvokeAsync(StateHasChanged);
+    }
+
+    private void SignOutAsync()
+    {
+        // NavigationManager.NavigateTo("signout-google", forceLoad: true);
+        NavigationManager.NavigateTo("/Account/Logout", forceLoad: true);
+
+    }
+
+    private string GenerateInitials(string username)
+    {
+        if (string.IsNullOrEmpty(username)) return "NA";
+        return string.Join("", username.Split(' ').Select(s => s[0])).ToUpper();
+    }
+}
