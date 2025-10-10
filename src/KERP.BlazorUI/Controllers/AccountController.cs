@@ -154,7 +154,7 @@ public class AccountController : Controller
     /// <summary>
     /// Wylogowanie użytkownika.
     /// </summary>
-    [HttpPost]
+    [HttpGet]
     public async Task<IActionResult> Logout(string? returnUrl = null)
     {
         await _signInManager.SignOutAsync();
