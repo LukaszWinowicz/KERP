@@ -1,0 +1,117 @@
+﻿@page "/Account/Login"
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using KERP.Domain.Aggregates.User
+@inject SignInManager<ApplicationUser> SignInManager
+@inject NavigationManager NavigationManager
+
+<PageTitle>Sign in - KERP</PageTitle>
+
+<div class="login-container">
+    <FluentCard class="login-card">
+        <h2>Welcome to KERP</h2>
+        <p class="subtitle">Sign in to continue</p>
+
+        @if (!string.IsNullOrEmpty(ErrorMessage))
+        {
+            <FluentMessageBar Intent="MessageIntent.Error" Style="margin-bottom: 20px;">
+                @ErrorMessage
+            </FluentMessageBar>
+        }
+
+        <div class="external-login-section">
+            <form method="post" action="/Account/ExternalLogin?provider=Google&returnUrl=@ReturnUrl">
+                <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent" Style="width: 100%;">
+                    <FluentIcon Value="@(new Icons.Filled.Size24.PersonAccounts())" Slot="start" />
+                    Sign in with Google
+                </FluentButton>
+            </form>
+        </div>
+
+        <div class="divider">
+            <span>or</span>
+        </div>
+
+        <div class="local-login-section">
+            <p class="info-text">Email/Password login coming soon...</p>
+        </div>
+    </FluentCard>
+</div>
+
+<style>
+    .login-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        min-height: 80vh;
+        padding: 20px;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 400px;
+        padding: 40px;
+    }
+
+    .login-card h2 {
+        margin: 0 0 8px 0;
+        text-align: center;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: var(--neutral-foreground-hint);
+        margin: 0 0 32px 0;
+    }
+
+    .external-login-section {
+        margin-bottom: 24px;
+    }
+
+    .divider {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        margin: 24px 0;
+    }
+
+    .divider::before,
+    .divider::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid var(--neutral-stroke-divider-rest);
+    }
+
+    .divider span {
+        padding: 0 12px;
+        color: var(--neutral-foreground-hint);
+        font-size: 14px;
+    }
+
+    .local-login-section {
+        text-align: center;
+    }
+
+    .info-text {
+        color: var(--neutral-foreground-hint);
+        font-size: 14px;
+        margin: 0;
+    }
+</style>
+
+@code {
+    [SupplyParameterFromQuery]
+    public string? ReturnUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? ErrorMessage { get; set; }
+
+    protected override void OnInitialized()
+    {
+        // Jeśli użytkownik jest już zalogowany, przekieruj do strony głównej
+        if (SignInManager.IsSignedIn(new System.Security.Claims.ClaimsPrincipal()))
+        {
+            NavigationManager.NavigateTo(ReturnUrl ?? "/");
+        }
+    }
+}
