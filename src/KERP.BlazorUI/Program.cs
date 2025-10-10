@@ -1,56 +1,81 @@
-﻿using KERP.BlazorUI.Components;
-using Microsoft.FluentUI.AspNetCore.Components;
-using KERP.Application;
+﻿using KERP.Application;
+using KERP.BlazorUI.Components;
+using KERP.BlazorUI.Extensions;
 using KERP.Infrastructure;
+using Microsoft.FluentUI.AspNetCore.Components;
 using Serilog;
 
-// Konfiguracja Seriloga
+// ═══════════════════════════════════════════════════════════════════════════════
+// SERILOG CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
 Log.Logger = new LoggerConfiguration()
-    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning) // Ustawienie minimalnego poziomu logowania dla Microsoft (ukrywa szym z logów systemowych)
-    .Enrich.FromLogContext() // Kluczowe dla Correlation ID
-    .WriteTo.Console() // Kieruje logi do konsoli
+    .MinimumLevel.Override("Microsoft", Serilog.Events.LogEventLevel.Warning)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
     .CreateLogger();
 
 try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    // Add services to the container.
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // SERVICES CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════════
+
+    // Blazor
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
+
+    // FluentUI
     builder.Services.AddFluentUIComponents();
 
+    // HttpContext (potrzebne dla CurrentUserService)
     builder.Services.AddHttpContextAccessor();
 
+    // Application & Infrastructure layers
     builder.Services.AddApplication();
     builder.Services.AddInfrastructure(builder.Configuration);
 
+    // Authentication with Google OAuth (z Extension Method!)
+    builder.Services.AddAuthenticationWithGoogle(builder.Configuration);
+
+    // MVC Controllers (potrzebne dla OAuth callbacks)
+    builder.Services.AddMvcControllers();
+
+    // ═══════════════════════════════════════════════════════════════════════════════
+    // APP CONFIGURATION
+    // ═══════════════════════════════════════════════════════════════════════════════
     var app = builder.Build();
 
-    // Configure the HTTP request pipeline.
+    // Exception handling
     if (!app.Environment.IsDevelopment())
     {
         app.UseExceptionHandler("/Error", createScopeForErrors: true);
-        // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
         app.UseHsts();
     }
 
     app.UseHttpsRedirection();
-
     app.UseStaticFiles();
     app.UseAntiforgery();
 
+    // Authentication & Authorization (WAŻNA KOLEJNOŚĆ!)
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Map Razor Components
     app.MapRazorComponents<App>()
         .AddInteractiveServerRenderMode();
 
-    app.Run();
+    // Map Controllers (dla OAuth callbacks)
+    app.MapControllers();
 
+    app.Run();
 }
 catch (Exception ex)
 {
-    Log.Fatal(ex, "Aplikacja nie mogża się uruchomić.");
+    Log.Fatal(ex, "Aplikacja nie mogła się uruchomić.");
 }
 finally
 {
-    Log.CloseAndFlush(); // Upewnij siê, ¿e wszystkie logi s¹ zapisane przed zakoñczeniem aplikacji
+    Log.CloseAndFlush();
 }
