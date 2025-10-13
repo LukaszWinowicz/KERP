@@ -57,6 +57,8 @@ public static class AuthenticationExtensions
                 googleOptions.SaveTokens = true;
 
                 // Scope
+                googleOptions.Scope.Add("https://www.googleapis.com/auth/calendar.readonly");
+                googleOptions.Scope.Add("https://www.googleapis.com/auth/user.addresses.read");
                 googleOptions.Scope.Add("profile");
                 googleOptions.Scope.Add("email");
 

@@ -1,9 +1,17 @@
-﻿@using Microsoft.AspNetCore.Components.Authorization
+﻿@using KERP.Application.Services
+@using Microsoft.AspNetCore.Components.Authorization
 @rendermode InteractiveServer
 @inject NavigationManager NavigationManager
+@inject ICurrentUserService CurrentUserService
 
 <FluentHeader>
-    KERP
+     KERP QA
+    <AuthorizeView>
+        <Authorized>           
+            @CurrentUserService.FactoryId           
+        </Authorized>
+    </AuthorizeView>
+
     <FluentSpacer />
     <AuthorizeView>
         <Authorized>
@@ -18,7 +26,6 @@
                 </FluentCounterBadge>
             </div>
             <FluentSpacer Width="15" />
-            @* <form method="post" action="signout-google"> *@
                 <form method="post" action="/Account/Logout">
 
                 <FluentProfileMenu Initials="@GenerateInitials(Username)"
@@ -26,6 +33,16 @@
                                    EMail="@Email"
                                    OnHeaderButtonClick="@SignOutAsync">
                     <FooterTemplate>
+                        <div style="text-align: center;">
+                            @if (!string.IsNullOrEmpty(CurrentUserService.FactoryName))
+                            {
+                                <FluentDivider Style="margin: 10px 0;" />
+                                <div style="color: black; font-size: 12px;">
+                                    <FluentIcon Value="@(new Icons.Regular.Size16.Building())" Style="vertical-align: middle;" />
+                                    @CurrentUserService.FactoryName
+                                </div>
+                            }
+                        </div>
                         <FluentStack></FluentStack>
                     </FooterTemplate>
                 </FluentProfileMenu>
@@ -66,8 +83,9 @@
         if (AuthState != null)
         {
             var authState = await AuthState;
-            Username = authState.User.Claims.FirstOrDefault(x => x.Type == "GivenUsername")?.Value ?? string.Empty;
-            Email = authState.User.Claims.FirstOrDefault(x => x.Type == "GivenEmail")?.Value ?? string.Empty;
+            // Używamy CurrentUserService zamiast bezpośrednio claims
+            Username = CurrentUserService.Username ?? string.Empty;
+            Email = CurrentUserService.Email ?? string.Empty;
         }
     }
 
@@ -81,7 +99,6 @@
 
     private void SignOutAsync()
     {
-        // NavigationManager.NavigateTo("signout-google", forceLoad: true);
         NavigationManager.NavigateTo("/Account/Logout", forceLoad: true);
 
     }
@@ -89,6 +106,17 @@
     private string GenerateInitials(string username)
     {
         if (string.IsNullOrEmpty(username)) return "NA";
-        return string.Join("", username.Split(' ').Select(s => s[0])).ToUpper();
+
+        var parts = username.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            // Pierwsze litery imienia i nazwiska
+            return $"{parts[0][0]}{parts[^1][0]}".ToUpper();
+        }
+
+        // Jeśli tylko jedno słowo, weź pierwsze dwie litery
+        return username.Length >= 2
+            ? username.Substring(0, 2).ToUpper()
+            : username.ToUpper();
     }
 }
