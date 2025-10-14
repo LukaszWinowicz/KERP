@@ -79,7 +79,7 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
 
             // ⚠️ WAŻNE: NIE wywołujemy next() - pipeline jest przerwany!
             // Handler się nie wykona, transakcja nie zostanie rozpoczęta.
-            return CreateFailureResult(resultErrors);
+            return ResultFactory.CreateFailure<TResponse>(resultErrors);
         }
 
         // ═══════════════════════════════════════════════════════════════════════════════
@@ -88,55 +88,4 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
 
         return await next();
     }
-
-    /// <summary>
-    /// Tworzy Result.Failure dla typu TResponse.
-    /// </summary>
-    /// <remarks>
-    /// Ta metoda jest identyczna jak w ExceptionHandlingBehavior.
-    /// W idealnym świecie, byłaby w osobnej klasie pomocniczej (np. ResultFactory).
-    /// </remarks>
-    private static TResponse CreateFailureResult(IReadOnlyCollection<Error> errors)
-    {
-        var responseType = typeof(TResponse);
-
-        if (responseType == typeof(Result))
-        {
-            var result = Result.Failure(errors);
-            return (TResponse)(object)result;
-        }
-
-        if (responseType.IsGenericType &&
-            responseType.GetGenericTypeDefinition() == typeof(Result<>))
-        {
-            var valueType = responseType.GetGenericArguments()[0];
-            var resultType = typeof(Result<>).MakeGenericType(valueType);
-            var failureMethod = resultType.GetMethod(
-                "Failure",
-                System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Static,
-                null,
-                new[] { typeof(IReadOnlyCollection<Error>) },
-                null);
-
-            if (failureMethod == null)
-            {
-                throw new InvalidOperationException(
-                    $"Could not find Failure method on type {resultType.Name}.");
-            }
-
-            var result = failureMethod.Invoke(null, new object[] { errors });
-
-            if (result == null)
-            {
-                throw new InvalidOperationException(
-                    $"Failure method on {resultType.Name} returned null.");
-            }
-
-            return (TResponse)result;
-        }
-
-        throw new InvalidOperationException(
-            $"Unsupported result type: {responseType.Name}.");
-    }
-
 }
