@@ -2,7 +2,6 @@
 using KERP.Application.Common.Models;
 using KERP.Domain.Exceptions;
 using Microsoft.Extensions.Logging;
-using System.Reflection;
 
 namespace KERP.Application.Common.Behaviors;
 
@@ -66,8 +65,8 @@ public class ExceptionHandlingBehavior<TRequest, TResponse>
                 Description: ex.Message,
                 Type: ErrorType.Critical);
 
-            // Konwertuj na Result.Failure
-            return CreateFailureResult(new[] { error });
+            // Konwertuj na Result.Failure używając nowej fabryki
+            return ResultFactory.CreateFailure<TResponse>(new[] { error });
         }
 
         // CATCH 2: Wszystkie inne wyjątki (nieoczekiwane)
@@ -96,86 +95,8 @@ public class ExceptionHandlingBehavior<TRequest, TResponse>
                 Description: "Wystąpił nieoczekiwany błąd serwera. Spróbuj ponownie później.",
                 Type: ErrorType.Critical);
 
-            // Konwertuj na Result.Failure
-            return CreateFailureResult(new[] { error });
+            // Konwertuj na Result.Failure używając nowej fabryki
+            return ResultFactory.CreateFailure<TResponse>(new[] { error });
         }
     }
-
-    /// <summary>
-    /// Tworzy Result.Failure dla typu TResponse (Result lub Result&lt;T&gt;).
-    /// </summary>
-    /// <param name="errors">Lista błędów.</param>
-    /// <returns>Instancja TResponse reprezentująca porażkę.</returns>
-    /// <remarks>
-    /// Ta metoda używa reflection aby stworzyć odpowiedni typ Result:
-    /// - Dla TResponse = Result → Result.Failure(errors)
-    /// - Dla TResponse = Result&lt;ProductDto&gt; → Result&lt;ProductDto&gt;.Failure(errors)
-    /// 
-    /// Reflection jest potrzebne bo system typów C# nie pozwala na bezpośrednie użycie
-    /// generycznego typu TResponse w tym kontekście (limitation kompilatora).
-    /// </remarks>
-    private static TResponse CreateFailureResult(IReadOnlyCollection<Error> errors)
-    {
-        var responseType = typeof(TResponse);
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // PRZYPADEK 1: TResponse = Result (bez generyka)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        if (responseType == typeof(Result))
-        {
-            // Prosty cast - Result.Failure zwraca Result
-            var result = Result.Failure(errors);
-            return (TResponse)(object)result;
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // PRZYPADEK 2: TResponse = Result<T> (generyczny)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        if (responseType.IsGenericType &&
-            responseType.GetGenericTypeDefinition() == typeof(Result<>))
-        {
-            // Wyciągnij typ T z Result<T>
-            // Np. dla Result<ProductDto> → valueType = ProductDto
-            var valueType = responseType.GetGenericArguments()[0];
-
-            // Zbuduj typ Result<T> w runtime
-            // typeof(Result<>) + ProductDto → Result<ProductDto>
-            var resultType = typeof(Result<>).MakeGenericType(valueType);
-
-            // Znajdź metodę statyczną Failure na Result<ProductDto>
-            var failureMethod = resultType.GetMethod(
-                "Failure",
-                BindingFlags.Public | BindingFlags.Static,
-                null,
-                new[] { typeof(IReadOnlyCollection<Error>) },
-                null);
-
-            if (failureMethod == null)
-            {
-                throw new InvalidOperationException(
-                    $"Could not find Failure method on type {resultType.Name}. " +
-                    "Ensure Result<T> has a public static Failure method.");
-            }
-
-            // Wywołaj Result<ProductDto>.Failure(errors)
-            var result = failureMethod.Invoke(null, new object[] { errors });
-
-            if (result == null)
-            {
-                throw new InvalidOperationException(
-                    $"Failure method on {resultType.Name} returned null.");
-            }
-
-            // Cast do TResponse
-            return (TResponse)result;
-        }
-
-        // ═══════════════════════════════════════════════════════════════════════════════
-        // PRZYPADEK 3: TResponse to coś innego (błąd)
-        // ═══════════════════════════════════════════════════════════════════════════════
-        throw new InvalidOperationException(
-            $"Unsupported result type: {responseType.Name}. " +
-            "ExceptionHandlingBehavior requires TResponse to be Result or Result<T>.");
-    }
-
 }
