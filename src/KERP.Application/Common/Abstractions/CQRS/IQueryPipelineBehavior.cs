@@ -18,21 +18,6 @@
 /// * TransactionBehavior - zapytania nie modyfikują danych
 /// </remarks>
 public interface IQueryPipelineBehavior<in TQuery, TResponse>
+    : IPipelineBehavior<TQuery, TResponse>
 {
-    /// <summary>
-    /// Wykonuje logikę behavior'a w pipeline'ie dla zapytania.
-    /// </summary>
-    /// <param name="query">Zapytanie przechodzące przez pipeline.</param>
-    /// <param name="next">Delegat do następnego ogniwa w łańcuchu. 
-    /// Wywołanie next() uruchamia kolejny behavior lub właściwy handler.
-    /// Można NIE wywowływać next() aby przerwać łańcuch (np. przy cache hit).</param>
-    /// <param name="cancellationToken">Token anulowania operacji, propagowany przez cały pipeline.</param>
-    /// <returns>Odpowiedź z pipeline'u. Behavior może:
-    /// * Przekazać odpowiedź bez zmian
-    /// * Zwrócić zakeszowaną odpowiedź (bez wywołania handlera)
-    /// * Zwrócić Result.Failure przy wyjątku.</returns>
-    Task<TResponse> HandleAsync(
-        TQuery query,
-        Func<Task<TResponse>> next,
-        CancellationToken cancellationToken = default);
 }

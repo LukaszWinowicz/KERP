@@ -21,101 +21,66 @@ public sealed class Mediator : IMediator
     }
 
     /// <inheritdoc />
-    public async Task<TResult> SendCommandAsync<TCommand, TResult>(TCommand command, CancellationToken cancellationToken = default) where TCommand : ICommand<TResult>
+    public Task<TResult> SendCommandAsync<TCommand, TResult>(TCommand command, CancellationToken cancellationToken = default) where TCommand : ICommand<TResult>
     {
-        // KROK 1: Walidacja wejścia
         if (command == null)
-        {
-            throw new ArgumentNullException(nameof(command),
-                "Command cannot be null. Ensure you pass a valid command instance.");
-        }
+            throw new ArgumentNullException(nameof(command));
 
-        // KROK 2: Resolve handler z DI
-        // GetService<T>() - zwraca null jeśli nie znaleziono
-        // GetRequiredService<T>() - rzuca wyjątek jeśli nie znaleziono (preferowane)
-        var handler = _serviceProvider.GetService<ICommandHandler<TCommand, TResult>>();
+        var handler = _serviceProvider.GetService<ICommandHandler<TCommand, TResult>>()
+            ?? throw new InvalidOperationException($"No handler registered for command '{typeof(TCommand).Name}'.");
 
-        if (handler == null)
-        {
-            throw new InvalidOperationException(
-                $"No handler registered for command '{typeof(TCommand).Name}'. " +
-                $"Ensure that ICommandHandler<{typeof(TCommand).Name}, {typeof(TResult).Name}> " +
-                "is registered in the DI container.");
-        }
+        var behaviors = _serviceProvider.GetServices<ICommandPipelineBehavior<TCommand, TResult>>();
 
-        // KROK 3: Resolve wszystkich behaviors dla tego typu requestu
-        // GetServices<T>() zwraca IEnumerable<T> - wszystkie zarejestrowane implementacje
-        // Kolejność jest określona przez kolejność rejestracji w DI
-        var behaviors = _serviceProvider
-            .GetServices<ICommandPipelineBehavior<TCommand, TResult>>()
-            .ToList(); // ToList() aby zmaterializować kolekcję
+        var pipeline = BuildPipeline(
+            command,
+            () => handler.HandleAsync(command, cancellationToken),
+            behaviors,
+            cancellationToken);
 
-        // KROK 4: Build pipeline - budowanie łańucha wywołań.
-
-        // To jest "rdzeń cebuli" - właściwy handler który wykonuje logikę biznesową
-        Func<Task<TResult>> handlerFunc = () => handler.HandleAsync(command, cancellationToken);
-
-        foreach (var behavior in behaviors.AsEnumerable().Reverse())
-        {
-            // Capture zmiennych w closure - ważne dla async/await
-            var currentBehavior = behavior;
-            var next = handlerFunc;
-
-            // Tworzymy nowy delegate, który wywołuje behavior z poprzednim delegate jako 'next'
-            handlerFunc = () => currentBehavior.HandleAsync(command, next, cancellationToken);
-        }
-
-        // KROK 5: Wykonanie pipeline
-
-        // handlerFunc() uruchamia pierwszy behavior (np. Logging)
-        // Ten behavior wywołuje next(), który uruchamia kolejny behavior (np. Validation)
-        // I tak dalej, aż do handlera
-        // Potem wszystko "wraca" w odwrotnej kolejności (jak cebula)
-        return await handlerFunc();
+        return pipeline();
     }
 
     /// <inheritdoc />
-    public async Task<TResult> SendQueryAsync<TQuery, TResult>(TQuery query, CancellationToken cancellationToken = default) where TQuery : IQuery<TResult>
+    public Task<TResult> SendQueryAsync<TQuery, TResult>(TQuery query, CancellationToken cancellationToken = default) where TQuery : IQuery<TResult>
     {
-        // KROK 1: Walidacja wejścia
         if (query == null)
-        {
-            throw new ArgumentNullException(nameof(query),
-                "Query cannot be null. Ensure you pass a valid query instance.");
-        }
+            throw new ArgumentNullException(nameof(query));
 
-        // KROK 2: Resolve handlera z DI
-        var handler = _serviceProvider.GetService<IQueryHandler<TQuery, TResult>>();
+        var handler = _serviceProvider.GetService<IQueryHandler<TQuery, TResult>>()
+            ?? throw new InvalidOperationException($"No handler registered for query '{typeof(TQuery).Name}'.");
 
-        if (handler == null)
-        {
-            throw new InvalidOperationException(
-                $"No handler registered for query '{typeof(TQuery).Name}'. " +
-                $"Ensure that IQueryHandler<{typeof(TQuery).Name}, {typeof(TResult).Name}> " +
-                "is registered in the DI container.");
-        }
+        var behaviors = _serviceProvider.GetServices<IQueryPipelineBehavior<TQuery, TResult>>();
 
-        // KROK 3: Resolve wszystkich behaviors dla tego typu requestu
-        // Query pipeline zazwyczaj ma inne behaviors niż Command:
-        // - Command: Logging, Validation, Transaction, Exception
-        // - Query: Logging, Cache, Exception
-        var behaviors = _serviceProvider
-            .GetServices<IQueryPipelineBehavior<TQuery, TResult>>()
-            .ToList();
+        var pipeline = BuildPipeline(
+            query,
+            () => handler.HandleAsync(query, cancellationToken),
+            behaviors,
+            cancellationToken);
 
-        // KROK 4: Build pipeline
-        // Dokładnie ta sama logika jak w SendCommandAsync
-        Func<Task<TResult>> handlerFunc = () => handler.HandleAsync(query, cancellationToken);
+        return pipeline();
+    }
 
-        foreach (var behavior in behaviors.AsEnumerable().Reverse())
+    /// <summary>
+    /// Buduje pipeline wywołań (łańcuch odpowiedzialności) dla danego requestu.
+    /// </summary>
+    private static Func<Task<TResult>> BuildPipeline<TRequest, TResult>(
+        TRequest request,
+        Func<Task<TResult>> handlerFunc,
+        IEnumerable<IPipelineBehavior<TRequest, TResult>> behaviors,
+        CancellationToken cancellationToken)
+    {
+        // Odwracamy kolekcję, aby złożyć pipeline od wewnątrz do zewnątrz
+        // Ostatni behavior będzie wywołany jako pierwszy.
+        foreach (var behavior in behaviors.Reverse())
         {
             var currentBehavior = behavior;
             var next = handlerFunc;
-            handlerFunc = () => currentBehavior.HandleAsync(query, next, cancellationToken);
+
+            // Tworzymy nowy delegat, który zamyka w sobie aktualny behavior
+            // i delegat do następnego kroku w pipeline'ie ('next').
+            handlerFunc = () => currentBehavior.HandleAsync(request, next, cancellationToken);
         }
 
-        // KROK 5: Wykonanie pipeline
-        return await handlerFunc();
-
+        return handlerFunc;
     }
 }
