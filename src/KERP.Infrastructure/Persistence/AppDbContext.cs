@@ -1,5 +1,5 @@
 ﻿using System.Reflection;
-using KERP.Application.Common.Abstractions;
+using KERP.Application.Common.Abstractions.CQRS;
 using KERP.Domain.Aggregates.Factory;
 using KERP.Domain.Aggregates.User;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;

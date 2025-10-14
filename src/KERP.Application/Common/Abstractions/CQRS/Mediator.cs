@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 
-namespace KERP.Application.Common.Abstractions;
+namespace KERP.Application.Common.Abstractions.CQRS;
 
 /// <summary>
 /// Implementacja mediatora odpowiedzialnego za routing requestów do odpowiednich handlerów

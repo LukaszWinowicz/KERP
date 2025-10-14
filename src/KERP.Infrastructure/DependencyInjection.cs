@@ -1,6 +1,8 @@
-﻿using KERP.Application.Common.Abstractions;
+﻿using KERP.Application.Common.Abstractions.CQRS;
+using KERP.Application.Common.Abstractions.Repositories;
 using KERP.Application.Services;
 using KERP.Infrastructure.Persistence;
+using KERP.Infrastructure.Persistence.Repositories;
 using KERP.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -25,6 +27,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+        services.AddScoped<IFactoryRepository, FactoryRepository>();
 
         return services;
     }
