@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore.Infrastructure;
 
-namespace KERP.Application.Common.Abstractions;
+namespace KERP.Application.Common.Abstractions.CQRS;
 
 public interface IAppDbContext
 {

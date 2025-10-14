@@ -1,4 +1,4 @@
-﻿using KERP.Application.Common.Abstractions;
+﻿using KERP.Application.Common.Abstractions.CQRS;
 using KERP.Application.Common.Models;
 using Microsoft.Extensions.Logging;
 

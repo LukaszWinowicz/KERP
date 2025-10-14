@@ -1,4 +1,5 @@
-﻿using KERP.Domain.Aggregates.User;
+﻿using KERP.Application.Common.Abstractions.Repositories;
+using KERP.Domain.Aggregates.User;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
@@ -14,15 +15,18 @@ public class AccountController : Controller
     private readonly SignInManager<ApplicationUser> _signInManager;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<AccountController> _logger;
+    private readonly IFactoryRepository _factoryRepository;
 
     public AccountController(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
-        ILogger<AccountController> logger)
+        ILogger<AccountController> logger,
+        IFactoryRepository factoryRepository)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _logger = logger;
+        _factoryRepository = factoryRepository;
     }
 
     /// <summary>
@@ -73,7 +77,7 @@ public class AccountController : Controller
         var email = info.Principal.FindFirstValue(ClaimTypes.Email);
         var fullName = info.Principal.FindFirstValue(ClaimTypes.Name) ?? email?.Split('@')[0] ?? "User";
         var givenName = info.Principal.FindFirstValue(ClaimTypes.GivenName);
-        var surname = info.Principal.FindFirstValue(ClaimTypes.Surname);     
+        var surname = info.Principal.FindFirstValue(ClaimTypes.Surname);
 
         // Loguj otrzymane claims dla debugowania
         _logger.LogInformation("Google claims received - Email: {Email}, Name: {Name}, GivenName: {GivenName}, Surname: {Surname}",
@@ -159,6 +163,18 @@ public class AccountController : Controller
             EmailConfirmed = true, // Google już zweryfikował email
             FactoryId = 241 // Domyślna fabryka - w przyszłości można to zmienić na null i prosić o wybór
         };
+
+        if (user.FactoryId.HasValue)
+        {
+            var factoryExists = await _factoryRepository.ExistsAndIsActiveAsync(user.FactoryId.Value);
+            if (!factoryExists)
+            {
+                _logger.LogWarning(
+                    "Default factory {FactoryId} does not exist or is inactive, setting to null",
+                    user.FactoryId.Value);
+                user.FactoryId = null;
+            }
+        }
 
         var createResult = await _userManager.CreateAsync(user);
         if (!createResult.Succeeded)
@@ -249,11 +265,32 @@ public class AccountController : Controller
         if (user.FactoryId.HasValue)
         {
             newClaims.Add(new Claim("FactoryId", user.FactoryId.Value.ToString()));
+            // Pobierz factory z bazy danych
+            var factory = await _factoryRepository.GetByIdAsync(user.FactoryId.Value);
 
-            // TODO: W przyszłości pobierać nazwę z bazy/słownika
-            // Na razie hardkodujemy mapowanie
-            var factoryName = GetFactoryName(user.FactoryId.Value);
-            newClaims.Add(new Claim("FactoryName", factoryName));
+            if (factory != null)
+            {
+                newClaims.Add(new Claim("FactoryName", factory.Name));
+
+                // Opcjonalnie: sprawdź czy fabryka jest aktywna
+                if (!factory.IsActive)
+                {
+                    _logger.LogWarning(
+                        "User {UserId} has assigned inactive factory {FactoryId}",
+                        user.Id,
+                        factory.Id);
+                }
+            }
+            else
+            {
+                _logger.LogError(
+                    "Factory {FactoryId} not found for user {UserId}",
+                    user.FactoryId.Value,
+                    user.Id);
+
+                // Fallback
+                newClaims.Add(new Claim("FactoryName", $"Factory {user.FactoryId.Value}"));
+            }
         }
 
         // Zapisz nowe claims
@@ -269,21 +306,5 @@ public class AccountController : Controller
             var errors = string.Join(", ", addResult.Errors.Select(e => e.Description));
             _logger.LogError("Failed to add claims for user {UserId}: {Errors}", user.Id, errors);
         }
-    }
-
-    /// <summary>
-    /// Tymczasowa metoda do mapowania FactoryId na nazwę.
-    /// W przyszłości należy to zastąpić serwisem lub repozytorium.
-    /// </summary>
-    private string GetFactoryName(int factoryId)
-    {
-        // TODO: Zastąpić rzeczywistym słownikiem lub zapytaniem do bazy
-        return factoryId switch
-        {
-            241 => "Stargard",
-            260 => "Ottawa",
-            273 => "Shanghai",
-            _ => $"Factory {factoryId}"
-        };
     }
 }

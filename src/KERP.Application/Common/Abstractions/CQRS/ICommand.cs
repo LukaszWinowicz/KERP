@@ -1,4 +1,4 @@
-﻿namespace KERP.Application.Common.Abstractions;
+﻿namespace KERP.Application.Common.Abstractions.CQRS;
 
 /// <summary>
 /// Interfejs-znacznik dla komendy, która nie zwraca żadnej wartości.

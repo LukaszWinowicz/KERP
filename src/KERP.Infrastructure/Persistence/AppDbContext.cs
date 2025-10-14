@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
-using KERP.Application.Common.Abstractions;
+using KERP.Application.Common.Abstractions.CQRS;
+using KERP.Domain.Aggregates.Factory;
 using KERP.Domain.Aggregates.User;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -8,6 +9,8 @@ namespace KERP.Infrastructure.Persistence;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser>, IAppDbContext
 {
+    public DbSet<Factory> Factories { get; set; }
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }

@@ -1,4 +1,4 @@
-﻿using KERP.Application.Common.Abstractions;
+﻿using KERP.Application.Common.Abstractions.CQRS;
 
 namespace KERP.Infrastructure.Persistence;
 

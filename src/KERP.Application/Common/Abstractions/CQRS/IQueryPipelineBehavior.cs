@@ -1,4 +1,4 @@
-﻿namespace KERP.Application.Common.Abstractions;
+﻿namespace KERP.Application.Common.Abstractions.CQRS;
 
 /// <summary>
 /// Definiuje kontrakt dla behavior'a w pipeline'ie przetwarzania QUERY.

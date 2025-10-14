@@ -1,4 +1,4 @@
-﻿namespace KERP.Application.Common.Abstractions;
+﻿namespace KERP.Application.Common.Abstractions.CQRS;
 
 public interface IQueryHandler<in TQuery, TResult>
     where TQuery : IQuery<TResult>

@@ -1,4 +1,4 @@
-﻿namespace KERP.Application.Common.Abstractions;
+﻿namespace KERP.Application.Common.Abstractions.CQRS;
 
 /// <summary>
 /// Definiuje handlera dla komendy zwracającej rezultat.

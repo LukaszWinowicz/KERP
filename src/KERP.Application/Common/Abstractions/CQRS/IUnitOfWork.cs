@@ -1,4 +1,4 @@
-﻿namespace KERP.Application.Common.Abstractions;
+﻿namespace KERP.Application.Common.Abstractions.CQRS;
 
 /// <summary>
 /// Definiuje kontrakt dla wzorca Unit of Work, reprezentującego pojedynczą transakcję biznesową.
