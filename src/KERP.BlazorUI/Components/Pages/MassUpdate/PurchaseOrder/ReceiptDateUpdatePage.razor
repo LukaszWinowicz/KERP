@@ -21,7 +21,7 @@
             
             <FluentTextField @bind-Value="Model.PurchaseOrderNumber" Label="Purchase Order Number" Placeholder="Enter 9-digit PO Number" Required="true" />
             
-            <FluentNumberField @bind-Value="Model.LineNumber" Label="Line Number" Min="10" />
+            <FluentNumberField @bind-Value="Model.LineNumber" Label="Line Number" Min="1" />
 
             <FluentNumberField @bind-Value="Model.Sequence" Label="Sequence" Min="1" />
 
@@ -31,6 +31,19 @@
                 <FluentOption Value="@(nameof(DateType.Confirmed))">Confirmed</FluentOption>
                 <FluentOption Value="@(nameof(DateType.Changed))">Changed</FluentOption>
             </FluentSelect>
+            
+            <!-- Nowy blok do wyświetlania błędów z serwera -->
+            @if (_serverErrors.Any())
+            {
+                <FluentMessageBar Intent="MessageIntent.Error" Title="Błędy operacji">
+                    <ul>
+                        @foreach (var error in _serverErrors)
+                        {
+                            <li>@error</li>
+                        }
+                    </ul>
+                </FluentMessageBar>
+            }
 
             <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Submit Change</FluentButton>
 
@@ -43,6 +56,9 @@
 
 @code {
     private ReceiptDateUpdateModel Model { get; set; } = new();
+    
+    // Nowa lista do przechowywania błędów zwróconych przez backend
+    private List<string> _serverErrors = new();
 
     protected override void OnInitialized()
     {
@@ -53,6 +69,9 @@
 
     private async Task HandleValidSubmitAsync()
     {
+        // Czyścimy listę błędów przed każdą próbą wysłania
+        _serverErrors.Clear();
+
         var command = new UpdateReceiptDateCommand(
             Model.PurchaseOrderNumber,
             Model.LineNumber,
@@ -66,7 +85,9 @@
 
         if (result.IsSuccess)
         {
+            // Powiadomienie o sukcesie pozostaje jako "toast"
             ToastService.ShowSuccess("Receipt date update submitted successfully!");
+            
             // Resetujemy model formularza, aby umożliwić dodanie kolejnego wpisu
             Model = new ReceiptDateUpdateModel
             {
@@ -76,9 +97,8 @@
         }
         else
         {
-            // Łączymy wszystkie błędy w jeden komunikat
-            var errorString = string.Join(", ", result.Errors.Select(e => e.Description));
-            ToastService.ShowError("Submission failed", null, errorString);
+            // Zamiast "toasta", wypełniamy listę błędów, która jest wyświetlana na stronie
+            _serverErrors = result.Errors.Select(e => e.Description).ToList();
         }
     }
 
