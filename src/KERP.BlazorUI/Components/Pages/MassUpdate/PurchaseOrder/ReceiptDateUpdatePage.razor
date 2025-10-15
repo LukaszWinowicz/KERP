@@ -1,0 +1,109 @@
+﻿@page "/mass-update/purchase-order/receipt-date"
+@using KERP.Application.Common.Abstractions.CQRS
+@using KERP.Application.Common.Abstractions.MassUpdate.PurchaseOrder.ReceiptDate
+@using KERP.Domain.Aggregates.MassUpdate.PurchaseOrder
+@using System.ComponentModel.DataAnnotations
+@rendermode InteractiveServer
+
+@inject IMediator Mediator
+@inject IToastService ToastService
+
+<PageTitle>Mass Update - Receipt Date</PageTitle>
+
+<h3>Update Purchase Order Receipt Date</h3>
+<p>Enter the details below to submit a receipt date change request.</p>
+
+<FluentCard Style="max-width: 600px; margin-top: 20px;">
+    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmitAsync" FormName="receipt-date-update-form">
+        <DataAnnotationsValidator />
+        
+        <FluentStack Orientation="Orientation.Vertical" Gap="20px">
+            
+            <FluentTextField @bind-Value="Model.PurchaseOrderNumber" Label="Purchase Order Number" Placeholder="Enter 9-digit PO Number" Required="true" />
+            
+            <FluentNumberField @bind-Value="Model.LineNumber" Label="Line Number" Min="10" />
+
+            <FluentNumberField @bind-Value="Model.Sequence" Label="Sequence" Min="1" />
+
+            <FluentDatePicker @bind-Value="Model.ReceiptDate" Label="New Receipt Date" Required="true" />
+
+            <FluentSelect TOption="string" @bind-Value="Model.DateType" Label="Date Type">
+                <FluentOption Value="@(nameof(DateType.Confirmed))">Confirmed</FluentOption>
+                <FluentOption Value="@(nameof(DateType.Changed))">Changed</FluentOption>
+            </FluentSelect>
+
+            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Submit Change</FluentButton>
+
+        </FluentStack>
+
+        <ValidationSummary style="margin-top: 20px;" />
+
+    </EditForm>
+</FluentCard>
+
+@code {
+    private ReceiptDateUpdateModel Model { get; set; } = new();
+
+    protected override void OnInitialized()
+    {
+        // Ustawienie wartości domyślnych dla formularza
+        Model.ReceiptDate = DateTime.Now.AddDays(1);
+        Model.DateType = nameof(DateType.Confirmed);
+    }
+
+    private async Task HandleValidSubmitAsync()
+    {
+        var command = new UpdateReceiptDateCommand(
+            Model.PurchaseOrderNumber,
+            Model.LineNumber,
+            Model.Sequence,
+            Model.ReceiptDate.Value, // Model i walidacja zapewniają, że data nie jest null
+            Enum.Parse<DateType>(Model.DateType)
+        );
+
+        // Wysyłamy command przez Mediator - cała logika walidacji i zapisu dzieje się na backendzie
+        var result = await Mediator.SendCommandAsync<UpdateReceiptDateCommand, KERP.Application.Common.Models.Result>(command);
+
+        if (result.IsSuccess)
+        {
+            ToastService.ShowSuccess("Receipt date update submitted successfully!");
+            // Resetujemy model formularza, aby umożliwić dodanie kolejnego wpisu
+            Model = new ReceiptDateUpdateModel
+            {
+                ReceiptDate = DateTime.Now.AddDays(1),
+                DateType = nameof(DateType.Confirmed)
+            };
+        }
+        else
+        {
+            // Łączymy wszystkie błędy w jeden komunikat
+            var errorString = string.Join(", ", result.Errors.Select(e => e.Description));
+            ToastService.ShowError("Submission failed", null, errorString);
+        }
+    }
+
+    /// <summary>
+    /// Klasa modelu używana do bindowania danych w formularzu.
+    /// Zawiera atrybuty walidacji, które są wykorzystywane przez EditForm.
+    /// </summary>
+    public class ReceiptDateUpdateModel
+    {
+        [Required(ErrorMessage = "Purchase Order Number is required.")]
+        [StringLength(9, MinimumLength = 9, ErrorMessage = "Purchase Order Number must be exactly 9 characters long.")]
+        public string PurchaseOrderNumber { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "Line Number is required.")]
+        [Range(1, int.MaxValue, ErrorMessage = "Line Number must be at least 1.")]
+        public int LineNumber { get; set; } = 1;
+
+        [Required(ErrorMessage = "Sequence is required.")]
+        [Range(1, int.MaxValue, ErrorMessage = "Sequence must be at least 1.")]
+        public int Sequence { get; set; } = 1;
+
+        [Required(ErrorMessage = "Receipt Date is required.")]
+        public DateTime? ReceiptDate { get; set; }
+
+        [Required(ErrorMessage = "Date Type is required.")]
+        public string? DateType { get; set; }
+    }
+}
