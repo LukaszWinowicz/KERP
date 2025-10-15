@@ -9,6 +9,11 @@
     <nav class="sitenav" aria-labelledby="main-menu">
         <FluentNavMenu Id="main-menu" Collapsible="true" Width="250" Title="Navigation menu" @bind-Expanded="expanded" CustomToggle="true">
             <FluentNavLink Href="/" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.Home())" IconColor="Color.Accent">Home</FluentNavLink>
+
+            <FluentNavGroup Title="Mass Updates" Icon="@(new Icons.Regular.Size20.Edit())" Gap="10px">
+                <FluentNavLink Href="/mass-update/purchase-order/receipt-date" Icon="@(new Icons.Regular.Size20.CalendarArrowRight())">PO Receipt Date</FluentNavLink>
+            </FluentNavGroup>
+
         </FluentNavMenu>
     </nav>
 </div>
