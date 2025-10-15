@@ -1,19 +1,22 @@
-﻿using System.Reflection;
-using KERP.Application.Common.Abstractions.CQRS;
+﻿using KERP.Application.Common.Abstractions.CQRS;
 using KERP.Domain.Aggregates.Factory;
+using KERP.Domain.Aggregates.MassUpdate.PurchaseOrder;
 using KERP.Domain.Aggregates.User;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using System.Reflection;
 
 namespace KERP.Infrastructure.Persistence;
 
 public class AppDbContext : IdentityDbContext<ApplicationUser>, IAppDbContext
 {
     public DbSet<Factory> Factories { get; set; }
+    public DbSet<ReceiptDateUpdate> ReceiptDateUpdates { get; set; }
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
     }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // Ta linijka jest teraz jeszcze ważniejsza.
