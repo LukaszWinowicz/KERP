@@ -1,4 +1,5 @@
 ﻿using KERP.Application.Common.Abstractions.Repositories;
+using KERP.Application.Services;
 using KERP.Domain.Aggregates.User;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -16,17 +17,20 @@ public class AccountController : Controller
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly ILogger<AccountController> _logger;
     private readonly IFactoryRepository _factoryRepository;
+    private readonly IUserClaimsService _userClaimsService;
 
     public AccountController(
         SignInManager<ApplicationUser> signInManager,
         UserManager<ApplicationUser> userManager,
         ILogger<AccountController> logger,
-        IFactoryRepository factoryRepository)
+        IFactoryRepository factoryRepository,
+        IUserClaimsService userClaimsService)
     {
         _signInManager = signInManager;
         _userManager = userManager;
         _logger = logger;
         _factoryRepository = factoryRepository;
+        _userClaimsService = userClaimsService;
     }
 
     /// <summary>
@@ -120,7 +124,7 @@ public class AccountController : Controller
             }
 
             // Zaktualizuj claims dla istniejącego użytkownika
-            await UpdateUserClaimsAsync(user, fullName, email);
+            await _userClaimsService.UpdateUserClaimsAsync(user, fullName, email);
 
             return LocalRedirect(returnUrl);
         }
@@ -143,7 +147,7 @@ public class AccountController : Controller
             var addLoginResult = await _userManager.AddLoginAsync(existingUser, info);
             if (addLoginResult.Succeeded)
             {
-                await UpdateUserClaimsAsync(existingUser, fullName, email);
+                await _userClaimsService.UpdateUserClaimsAsync(existingUser, fullName, email);
                 await _signInManager.SignInAsync(existingUser, isPersistent: false);
                 _logger.LogInformation("External login added to existing user {Email}", email);
                 return LocalRedirect(returnUrl);
@@ -196,7 +200,7 @@ public class AccountController : Controller
         // KROK 4: Dodaj custom claims dla nowego użytkownika
         // ═══════════════════════════════════════════════════════════════════════════════
 
-        await UpdateUserClaimsAsync(user, fullName, email);
+        await _userClaimsService.UpdateUserClaimsAsync(existingUser, fullName, email);
 
         // Zaloguj użytkownika
         await _signInManager.SignInAsync(user, isPersistent: false);
@@ -220,91 +224,5 @@ public class AccountController : Controller
         }
 
         return LocalRedirect("/");
-    }
-
-    /// <summary>
-    /// Aktualizuje custom claims dla użytkownika.
-    /// Ta metoda zarządza wszystkimi naszymi własnymi claims.
-    /// </summary>
-    private async Task UpdateUserClaimsAsync(ApplicationUser user, string fullName, string email)
-    {
-        // Pobranie istniejących claims użytkownika.
-        var existingClaims = await _userManager.GetClaimsAsync(user);
-
-        // Lista typów claims, które chcemy zaktualizować
-        var claimTypesToUpdate = new[]
-        {
-            "GivenUsername",
-            "GivenEmail",
-            "FactoryId",
-            "FactoryName"
-        };
-
-        // Usunięcie starych wersji tych claims (jeśli istnieją)
-        var claimsToRemove = existingClaims
-            .Where(c => claimTypesToUpdate.Contains(c.Type))
-            .ToList();
-
-        if (claimsToRemove.Any())
-        {
-            var removeResult = await _userManager.RemoveClaimsAsync(user, claimsToRemove);
-            if (!removeResult.Succeeded)
-            {
-                _logger.LogWarning("Failed to remove old claims for user {UserId}", user.Id);
-            }
-        }
-
-        // Przygotuj nowe claims
-        var newClaims = new List<Claim>
-        {
-            new Claim("GivenUsername", fullName),
-            new Claim("GivenEmail", email)
-        };
-
-        // Dodaj FactoryId i FactoryName jeśli użytkownik ma przypisaną fabrykę
-        if (user.FactoryId.HasValue)
-        {
-            newClaims.Add(new Claim("FactoryId", user.FactoryId.Value.ToString()));
-            // Pobierz factory z bazy danych
-            var factory = await _factoryRepository.GetByIdAsync(user.FactoryId.Value);
-
-            if (factory != null)
-            {
-                newClaims.Add(new Claim("FactoryName", factory.Name));
-
-                // Opcjonalnie: sprawdź czy fabryka jest aktywna
-                if (!factory.IsActive)
-                {
-                    _logger.LogWarning(
-                        "User {UserId} has assigned inactive factory {FactoryId}",
-                        user.Id,
-                        factory.Id);
-                }
-            }
-            else
-            {
-                _logger.LogError(
-                    "Factory {FactoryId} not found for user {UserId}",
-                    user.FactoryId.Value,
-                    user.Id);
-
-                // Fallback
-                newClaims.Add(new Claim("FactoryName", $"Factory {user.FactoryId.Value}"));
-            }
-        }
-
-        // Zapisz nowe claims
-        var addResult = await _userManager.AddClaimsAsync(user, newClaims);
-        if (addResult.Succeeded)
-        {
-            _logger.LogInformation("Successfully update claims for user {UserId}", user.Id);
-            // WAŻNE: Odśwież sign-in aby nowe claims były widoczne od razu
-            await _signInManager.RefreshSignInAsync(user);
-        }
-        else
-        {
-            var errors = string.Join(", ", addResult.Errors.Select(e => e.Description));
-            _logger.LogError("Failed to add claims for user {UserId}: {Errors}", user.Id, errors);
-        }
     }
 }

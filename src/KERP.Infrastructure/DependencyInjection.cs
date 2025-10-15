@@ -27,6 +27,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IUserClaimsService, UserClaimsService>();
 
         services.AddScoped<IFactoryRepository, FactoryRepository>();
 
