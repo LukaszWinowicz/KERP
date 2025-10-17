@@ -24,7 +24,7 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
     /// </param>
     public ValidationBehavior(
         IEnumerable<IValidator<TRequest>> validators,
-        IServiceProvider serviceProvider) // ← NOWY PARAMETR
+        IServiceProvider serviceProvider)
     {
         _validators = validators ?? throw new ArgumentNullException(nameof(validators));
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
@@ -54,7 +54,7 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
         var validationTasks = _validators
             .Select(validator => validator.ValidateAsync(
                 request,
-                _serviceProvider, // ← PRZEKAZUJEMY ServiceProvider
+                _serviceProvider, // ← PRZEKAZUJE ServiceProvider
                 cancellationToken));
 
         var validationResults = await Task.WhenAll(validationTasks);
@@ -77,7 +77,7 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
             var resultErrors = errors
                 .Select(validationError => new Error(
                     Code: "ValidationError",
-                    Description: validationError.ErrorMessage,
+                    Description: $"{validationError.PropertyName}: {validationError.ErrorMessage}",
                     Type: ErrorType.Critical))
                 .ToList();
 
