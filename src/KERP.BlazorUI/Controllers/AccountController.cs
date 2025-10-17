@@ -123,6 +123,73 @@ public class AccountController : Controller
                 return LocalRedirect("/Account/Login?ErrorMessage=User account error");
             }
 
+            // ═══════════════════════════════════════════════════════════════════════════
+            // Auto-repair FactoryId jeśli jest NULL
+            // ═══════════════════════════════════════════════════════════════════════════
+
+            if (!user.FactoryId.HasValue)
+            {
+                _logger.LogWarning(
+                    "User {Email} has NULL FactoryId. Attempting to restore default factory.",
+                    email);
+
+                const int DEFAULT_FACTORY_ID = 241;
+
+                // Sprawdź czy domyślna fabryka istnieje i jest aktywna
+                var defaultFactoryExists = await _factoryRepository.ExistsAndIsActiveAsync(DEFAULT_FACTORY_ID);
+
+                if (defaultFactoryExists)
+                {
+                    // Przywróć domyślną fabrykę
+                    user.FactoryId = DEFAULT_FACTORY_ID;
+                    var updateResult = await _userManager.UpdateAsync(user);
+
+                    if (updateResult.Succeeded)
+                    {
+                        _logger.LogInformation(
+                            "Successfully restored FactoryId={FactoryId} for user {Email}",
+                            DEFAULT_FACTORY_ID,
+                            email);
+                    }
+                    else
+                    {
+                        var errors = string.Join(", ", updateResult.Errors.Select(e => e.Description));
+                        _logger.LogError(
+                            "Failed to restore FactoryId for user {Email}: {Errors}",
+                            email,
+                            errors);
+
+                        // Kontynuuj logowanie mimo błędu - user zobaczy walidację później
+                    }
+                }
+                else
+                {
+                    _logger.LogError(
+                        "Cannot restore FactoryId for user {Email}: Default factory {FactoryId} does not exist or is inactive",
+                        email,
+                        DEFAULT_FACTORY_ID);
+
+                    // Kontynuuj logowanie - user zobaczy błąd walidacji przy próbie operacji
+                }
+            }
+            else
+            {
+                // User ma FactoryId - sprawdź czy jest aktywna
+                var isFactoryActive = await _factoryRepository.ExistsAndIsActiveAsync(user.FactoryId.Value);
+
+                if (!isFactoryActive)
+                {
+                    _logger.LogWarning(
+                        "User {Email} has FactoryId={FactoryId} but factory is inactive or doesn't exist",
+                        email,
+                        user.FactoryId.Value);
+
+                    // Opcja A: Wymuś zmianę fabryki na domyślną
+                    // Opcja B: Wyloguj użytkownika z komunikatem
+                    // Na razie: kontynuuj, walidacja przechwyci później
+                }
+            }
+
             // Zaktualizuj claims dla istniejącego użytkownika
             await _userClaimsService.UpdateUserClaimsAsync(user, fullName, email);
 
