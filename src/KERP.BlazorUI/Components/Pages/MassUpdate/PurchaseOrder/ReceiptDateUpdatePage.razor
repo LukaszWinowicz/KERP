@@ -45,7 +45,11 @@
                 </FluentMessageBar>
             }
 
-            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Submit Change</FluentButton>
+            <FluentButton Type="ButtonType.Submit"
+                          Appearance="Appearance.Accent"
+                          Disabled="@_isSubmitting">
+                Submit Change
+            </FluentButton>
 
         </FluentStack>
 
@@ -54,11 +58,24 @@
     </EditForm>
 </FluentCard>
 
+@if (_isSubmitting)
+{
+    <div class="loading-overlay">
+        <div class="loading-spinner">
+            <FluentProgressRing Value="@(true ? null : 55)"
+                                Width="128px"
+                                Stroke="@ProgressStroke.Normal" />
+            <p>Submitting changes...</p>
+        </div>
+    </div> 
+}
+
 @code {
     private ReceiptDateUpdateModel Model { get; set; } = new();
-    
+
     // Nowa lista do przechowywania błędów zwróconych przez backend
     private List<string> _serverErrors = new();
+    private bool _isSubmitting = false;
 
     protected override void OnInitialized()
     {
@@ -71,34 +88,44 @@
     {
         // Czyścimy listę błędów przed każdą próbą wysłania
         _serverErrors.Clear();
+        _isSubmitting = true;
 
-        var command = new UpdateReceiptDateCommand(
-            Model.PurchaseOrderNumber,
-            Model.LineNumber,
-            Model.Sequence,
-            Model.ReceiptDate.Value, // Model i walidacja zapewniają, że data nie jest null
-            Enum.Parse<DateType>(Model.DateType)
+        try
+        {
+            await Task.Delay(5000);
+
+            var command = new UpdateReceiptDateCommand(
+                Model.PurchaseOrderNumber,
+                Model.LineNumber,
+                Model.Sequence,
+                Model.ReceiptDate.Value, // Model i walidacja zapewniają, że data nie jest null
+                Enum.Parse<DateType>(Model.DateType)
         );
 
-        // Wysyłamy command przez Mediator - cała logika walidacji i zapisu dzieje się na backendzie
-        var result = await Mediator.SendCommandAsync<UpdateReceiptDateCommand, KERP.Application.Common.Models.Result>(command);
+            // Wysyłamy command przez Mediator - cała logika walidacji i zapisu dzieje się na backendzie
+            var result = await Mediator.SendCommandAsync<UpdateReceiptDateCommand, KERP.Application.Common.Models.Result>(command);
 
-        if (result.IsSuccess)
-        {
-            // Powiadomienie o sukcesie pozostaje jako "toast"
-            ToastService.ShowSuccess("Receipt date update submitted successfully!");
-            
-            // Resetujemy model formularza, aby umożliwić dodanie kolejnego wpisu
-            Model = new ReceiptDateUpdateModel
+            if (result.IsSuccess)
             {
-                ReceiptDate = DateTime.Now.AddDays(1),
-                DateType = nameof(DateType.Confirmed)
-            };
+                // Powiadomienie o sukcesie pozostaje jako "toast"
+                ToastService.ShowSuccess("Receipt date update submitted successfully!");
+
+                // Resetujemy model formularza, aby umożliwić dodanie kolejnego wpisu
+                Model = new ReceiptDateUpdateModel
+                {
+                    ReceiptDate = DateTime.Now.AddDays(1),
+                    DateType = nameof(DateType.Confirmed)
+                };
+            }
+            else
+            {
+                // Zamiast "toasta", wypełniamy listę błędów, która jest wyświetlana na stronie
+                _serverErrors = result.Errors.Select(e => e.Description).ToList();
+            }
         }
-        else
+        finally
         {
-            // Zamiast "toasta", wypełniamy listę błędów, która jest wyświetlana na stronie
-            _serverErrors = result.Errors.Select(e => e.Description).ToList();
+            _isSubmitting = false;
         }
     }
 
@@ -127,3 +154,32 @@
         public string? DateType { get; set; }
     }
 }
+
+<style>
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-spinner {
+        background-color: white;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        text-align: center;
+    }
+
+        .loading-spinner p {
+            margin-top: 16px;
+            font-size: 16px;
+            color: #333;
+        }
+</style>
