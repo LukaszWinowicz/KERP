@@ -1,6 +1,7 @@
 ﻿@page "/mass-update/purchase-order/receipt-date"
 @using KERP.Application.Common.Abstractions.CQRS
 @using KERP.Application.Common.Abstractions.MassUpdate.PurchaseOrder.ReceiptDate
+@using KERP.BlazorUI.Components.Shared
 @using KERP.Domain.Aggregates.MassUpdate.PurchaseOrder
 @using System.ComponentModel.DataAnnotations
 @rendermode InteractiveServer
@@ -58,17 +59,9 @@
     </EditForm>
 </FluentCard>
 
-@if (_isSubmitting)
-{
-    <div class="loading-overlay">
-        <div class="loading-spinner">
-            <FluentProgressRing Value="@(true ? null : 55)"
-                                Width="128px"
-                                Stroke="@ProgressStroke.Normal" />
-            <p>Submitting changes...</p>
-        </div>
-    </div> 
-}
+<LoadingOverlay IsVisible="@_isSubmitting" 
+                Message="Submitting changes..." 
+                SpinnerSize="128px" />
 
 @code {
     private ReceiptDateUpdateModel Model { get; set; } = new();
@@ -154,32 +147,3 @@
         public string? DateType { get; set; }
     }
 }
-
-<style>
-    .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 9999;
-    }
-
-    .loading-spinner {
-        background-color: white;
-        padding: 40px;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        text-align: center;
-    }
-
-        .loading-spinner p {
-            margin-top: 16px;
-            font-size: 16px;
-            color: #333;
-        }
-</style>

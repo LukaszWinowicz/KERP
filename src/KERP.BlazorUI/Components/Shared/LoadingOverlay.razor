@@ -1,0 +1,60 @@
+﻿@if (IsVisible)
+{
+    <div class="loading-overlay">
+        <div class="loading-spinner">
+            <FluentProgressRing Value="@(true ? null : 55)"
+                                Width="@SpinnerSize"
+                                Stroke="@ProgressStroke.Normal" />
+            <p>@Message</p>
+        </div>
+    </div>
+}
+
+<style>
+    .loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+    }
+
+    .loading-spinner {
+        background-color: white;
+        padding: 40px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        text-align: center;
+    }
+
+        .loading-spinner p {
+            margin-top: 16px;
+            font-size: 16px;
+            color: #333;
+        }
+</style>
+
+@code {
+    /// <summary>
+    /// Kontroluje widoczność overlay.
+    /// </summary>
+    [Parameter]
+    public bool IsVisible { get; set; }
+
+    /// <summary>
+    /// Wiadomość wyświetlana pod spinnerem.
+    /// </summary>
+    [Parameter]
+    public string Message { get; set; } = "Loading...";
+
+    /// <summary>
+    /// Rozmiar spinnera (np. "128px", "64px").
+    /// </summary>
+    [Parameter]
+    public string SpinnerSize { get; set; } = "128px";
+}
