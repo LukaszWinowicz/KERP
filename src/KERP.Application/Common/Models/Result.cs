@@ -14,7 +14,7 @@ public class Result
         Errors = errors ?? new List<Error>();
     }
 
-    public static Result Success(List<RowValidationResult> results) => new Result(true, Array.Empty<Error>());
+    public static Result Success() => new Result(true, Array.Empty<Error>());
 
     public static Result Failure(IReadOnlyCollection<Error> errors)
     {

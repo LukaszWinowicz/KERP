@@ -1,4 +1,5 @@
-﻿using KERP.Application.Validation.Chain.Handlers;
+﻿using KERP.Application.Common.Abstractions.CQRS;
+using KERP.Application.Validation.Chain.Handlers;
 
 namespace KERP.Application.Validation.Chain;
 
@@ -57,15 +58,46 @@ public class ValidationChainBuilder<T>
 
     }
 
-    /// <summary>
-    /// Dodaje do łańcucha regułę sprawdzającą, czy wartość nie jest nullem.
-    /// </summary>
     public ValidationChainBuilder<T> WithNotNull<TValue>(Func<T, TValue?> valueProvider, string fieldName)
     {
         AddHandler(new NotNullValidator<T, TValue>(valueProvider, fieldName));
         return this;
     }
 
+    /// <summary>
+    /// Dodaje walidację sprawdzającą czy FactoryId użytkownika z cookie
+    /// zgadza się z aktualnym FactoryId w bazie danych.
+    /// </summary>
+    public ValidationChainBuilder<T> WithUserFactory(string fieldName = "UserFactory")
+    {
+        AddHandler(new UserFactoryValidator<T>(fieldName));
+        return this;
+    }
+
+    /// <summary>
+    /// Dodaje walidację sprawdzającą czy fabryka użytkownika jest aktywna.
+    /// </summary>
+    public ValidationChainBuilder<T> WithFactoryActive(string fieldName = "Factory")
+    {
+        AddHandler(new FactoryActiveValidator<T>(fieldName));
+        return this;
+    }
+
+    /// <summary>
+    /// Automatycznie dodaje walidatory kontekstu użytkownika dla requestów
+    /// implementujących <see cref="IRequireFactoryValidation"/>.
+    /// </summary>
+    public ValidationChainBuilder<T> WithFactoryValidationIfRequired()
+    {
+        // Sprawdzamy czy typ T implementuje IRequireFactoryValidation
+        if (typeof(IRequireFactoryValidation).IsAssignableFrom(typeof(T)))
+        {
+            // Dodajemy walidatory w poprawnej kolejności
+            WithUserFactory();   // Najpierw zgodność cookie vs baza
+            WithFactoryActive(); // Potem aktywność fabryki
+        }
+        return this;
+    }
 
     /// <summary>
     /// Buduje łańcuch i zwraca jego pierwsze ogniwo.

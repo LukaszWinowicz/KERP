@@ -14,35 +14,60 @@ public class UpdateReceiptDateCommandHandler : ICommandHandler<UpdateReceiptDate
     private readonly ICurrentUserService _currentUserService;
     private readonly IUnitOfWork _unitOfWork;
 
-    public UpdateReceiptDateCommandHandler(IAppDbContext dbContext, ICurrentUserService currentUserService, IUnitOfWork unitOfWork)
+    public UpdateReceiptDateCommandHandler(
+        IAppDbContext dbContext,
+        ICurrentUserService currentUserService,
+        IUnitOfWork unitOfWork)
     {
         _dbContext = dbContext;
         _currentUserService = currentUserService;
         _unitOfWork = unitOfWork;
     }
 
-    public async Task<Result> HandleAsync(UpdateReceiptDateCommand command, CancellationToken cancellationToken)
+    public async Task<Result> HandleAsync(
+        UpdateReceiptDateCommand command,
+        CancellationToken cancellationToken)
     {
-        // Używamy metody fabrykującej z encji do stworzenia nowego obiektu
-        var receiptDateUpdate = ReceiptDateUpdate.Create(
-            purchaseOrderNumber: command.PurchaseOrderNumber,
-            lineNumber: command.LineNumber,
-            sequence: command.Sequence,
-            receiptDate: command.ReceiptDate,
-            dateType: command.DateType,
-            userId: _currentUserService.UserId!, // Zakładamy, że operacja wymaga zalogowanego użytkownika
-            factoryId: _currentUserService.FactoryId
-        );
+        {
 
-        // Dodajemy nową encję do DbContext.
-        // UWAGA: To jeszcze nie zapisuje danych w bazie, tylko oznacza obiekt jako "do dodania".
-        // Będziemy musieli dodać DbSet<ReceiptDateUpdate> do IAppDbContext
-        // _dbContext.ReceiptDateUpdates.Add(receiptDateUpdate);
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // KROK 1: Tworzenie encji domenowej przy użyciu Factory Method
+            // ═══════════════════════════════════════════════════════════════════════════════
 
-        // Zapisujemy zmiany w bazie danych.
-        // To wywołanie jest kluczowe, aby transakcja (zarządzana przez TransactionBehavior) mogła zatwierdzić zmiany.
-        await _unitOfWork.SaveChangesAsync(cancellationToken);
+            // Walidacja zapewniła że UserId i FactoryId nie są null,
+            // więc możemy bezpiecznie użyć .Value bez sprawdzania
+            var receiptDateUpdate = ReceiptDateUpdate.Create(
+                purchaseOrderNumber: command.PurchaseOrderNumber,
+                lineNumber: command.LineNumber,
+                sequence: command.Sequence,
+                receiptDate: command.ReceiptDate,
+                dateType: command.DateType,
+                userId: _currentUserService.UserId!, // Walidacja zapewnia że nie jest null
+                factoryId: _currentUserService.FactoryId!.Value); // Walidacja zapewnia że nie jest null
 
-        return Result.Success(new List<RowValidationResult>());
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // KROK 2: Dodanie encji do Change Tracker
+            // ═══════════════════════════════════════════════════════════════════════════════
+
+            // Entity Framework oznacza encję jako "Added"
+            // Fizyczny zapis do bazy nastąpi w SaveChangesAsync()
+            _dbContext.ReceiptDateUpdates.Add(receiptDateUpdate);
+
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // KROK 3: Zapis do bazy danych
+            // ═══════════════════════════════════════════════════════════════════════════════
+
+            // TransactionBehavior opakowuje to w transakcję bazodanową:
+            // - Result.IsSuccess → COMMIT
+            // - Result.IsFailure → ROLLBACK
+            // - Wyjątek → ROLLBACK + ExceptionHandlingBehavior
+            await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+            // ═══════════════════════════════════════════════════════════════════════════════
+            // KROK 4: Zwrócenie wyniku sukcesu
+            // ═══════════════════════════════════════════════════════════════════════════════
+
+            return Result.Success();
+        }
     }
 }
