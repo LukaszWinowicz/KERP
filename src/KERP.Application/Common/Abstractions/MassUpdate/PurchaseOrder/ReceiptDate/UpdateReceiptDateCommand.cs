@@ -5,12 +5,16 @@ using KERP.Domain.Aggregates.MassUpdate.PurchaseOrder;
 namespace KERP.Application.Common.Abstractions.MassUpdate.PurchaseOrder.ReceiptDate;
 
 /// <summary>
-/// Polecenie (Command) reprezentujące żądanie aktualizacji daty odbioru dla linii zamówienia.
-/// Używa rekordu, aby zapewnić niezmienność (immutability) danych wejściowych.
+/// Polecenie (Command) reprezentujące żądanie aktualizacji Receipt Date dla linii zamówienia.
+/// Implementuje IRequireFactoryValidation, co automatycznie włącza walidację:
+/// - Zgodności FactoryId użytkownika (cookie vs baza danych)
+/// - Aktywności fabryki użytkownika
 /// </summary>
 public record UpdateReceiptDateCommand(
     string PurchaseOrderNumber,
     int LineNumber,
     int Sequence,
     DateTime? ReceiptDate,
-    DateType DateType) : ICommand<Result>;
+    DateType DateType) 
+    : ICommand<Result>,
+      IRequireFactoryValidation;

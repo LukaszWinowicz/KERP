@@ -8,6 +8,7 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
     where TResponse : Result
 {
     private readonly IEnumerable<IValidator<TRequest>> _validators;
+    private readonly IServiceProvider _serviceProvider;
 
     /// <summary>
     /// Inicjalizuje nową instancję ValidationBehavior.
@@ -17,9 +18,16 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
     /// DI automatycznie wstrzyknie wszystkie zarejestrowane walidatory.
     /// Jeśli nie ma walidatorów, kolekcja będzie pusta (nie null).
     /// </param>
-    public ValidationBehavior(IEnumerable<IValidator<TRequest>> validators)
+    /// <param name="serviceProvider">
+    /// Dostawca usług używany przez walidatory do rozwiązywania zależności.
+    /// Walidatory mogą potrzebować dostępu do UserManager, Repositories itp.
+    /// </param>
+    public ValidationBehavior(
+        IEnumerable<IValidator<TRequest>> validators,
+        IServiceProvider serviceProvider) // ← NOWY PARAMETR
     {
         _validators = validators ?? throw new ArgumentNullException(nameof(validators));
+        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 
     /// <inheritdoc />
@@ -32,8 +40,6 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
         // KROK 1: Sprawdź czy są jakieś walidatory zarejestrowane
         // ═══════════════════════════════════════════════════════════════════════════════
 
-        // Jeśli nie ma walidatorów, od razu wywołaj next()
-        // (oszczędność - nie wykonujemy pustej pętli)
         if (!_validators.Any())
         {
             return await next();
@@ -44,9 +50,12 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
         // ═══════════════════════════════════════════════════════════════════════════════
 
         // Task.WhenAll wykonuje wszystkie walidatory jednocześnie
-        // To jest szybsze niż wykonywanie ich po kolei
+        // UWAGA: Teraz przekazujemy IServiceProvider do każdego walidatora!
         var validationTasks = _validators
-            .Select(validator => validator.ValidateAsync(request, cancellationToken));
+            .Select(validator => validator.ValidateAsync(
+                request,
+                _serviceProvider, // ← PRZEKAZUJEMY ServiceProvider
+                cancellationToken));
 
         var validationResults = await Task.WhenAll(validationTasks);
 
@@ -54,11 +63,6 @@ public class ValidationBehavior<TRequest, TResponse> : ICommandPipelineBehavior<
         // KROK 3: Zbierz wszystkie błędy z wszystkich walidatorów
         // ═══════════════════════════════════════════════════════════════════════════════
 
-        // SelectMany "spłaszcza" listy błędów z wielu walidatorów w jedną listę
-        // Przykład:
-        // Validator1.Errors = [Error1, Error2]
-        // Validator2.Errors = [Error3]
-        // SelectMany → [Error1, Error2, Error3]
         var errors = validationResults
             .SelectMany(result => result.Errors)
             .ToList();
