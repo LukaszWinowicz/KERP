@@ -1,0 +1,99 @@
+﻿<div class="data-container">
+
+    @* Header z akcjami (buttons, selects) *@
+    @if (HeaderContent != null)
+    {
+        <div class="data-header">
+            @HeaderContent
+        </div>
+    }
+
+    @* Nagłówki kolumn *@
+    @if (ColumnHeaders != null)
+    {
+        <div class="data-column-headers">
+            @ColumnHeaders
+        </div>
+    }
+
+    @* Główna zawartość (wiersze danych) *@
+    <div class="data-content">
+        @ChildContent
+    </div>
+
+    @* Footer (opcjonalny - Submit, Pagination) *@
+    @if (FooterContent != null)
+    {
+        <div class="data-footer">
+            @FooterContent
+        </div>
+    }
+</div>
+
+@code {
+    /// <summary>
+    /// Zawartość headera (przyciski, selecty, filtry).
+    /// </summary>
+    [Parameter]
+    public RenderFragment? HeaderContent { get; set; }
+
+    /// <summary>
+    /// Nagłówki kolumn.
+    /// </summary>
+    [Parameter]
+    public RenderFragment? ColumnHeaders { get; set; }
+
+    /// <summary>
+    /// Główna zawartość (wiersze danych).
+    /// </summary>
+    [Parameter]
+    public RenderFragment ChildContent { get; set; }
+
+    /// <summary>
+    /// Zawartość footera (Submit button, pagination).
+    /// </summary>
+    [Parameter]
+    public RenderFragment? FooterContent { get; set; }
+}
+
+<style>
+    .data-container {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        width: 100%;
+    }
+
+    .data-header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        padding: 1rem;
+        background-color: var(--neutral-layer-1);
+        border-radius: var(--corner-radius);
+    }
+
+    .data-column-headers {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 0.75rem 1rem;
+        background-color: var(--neutral-fill-secondary-rest);
+        font-weight: 600;
+        border-radius: var(--corner-radius);
+    }
+
+    .data-content {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    .data-footer {
+        display: flex;
+        justify-content: flex-end;
+        padding: 1rem;
+        background-color: var(--neutral-layer-1);
+        border-radius: var(--corner-radius);
+    }
+</style>

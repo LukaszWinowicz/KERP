@@ -3,6 +3,7 @@
 @using KERP.Application.Common.Abstractions.MassUpdate.PurchaseOrder.ReceiptDate
 @using KERP.Application.Common.Models
 @using KERP.BlazorUI.Components.Shared
+@using KERP.BlazorUI.Components.Shared.DataContainer
 @using KERP.Domain.Aggregates.MassUpdate.PurchaseOrder
 @using System.ComponentModel.DataAnnotations
 @rendermode InteractiveServer
@@ -16,14 +17,10 @@
 <h3>Batch Update Purchase Order Receipt Date</h3>
 <p>Add multiple rows and submit all at once.</p>
 
-<FluentCard Style="max-width: 1200px; margin-top: 20px;">
+<DataContainer>
     
-    <!-- SEKCJA 1: DateType + Przyciski akcji -->
-    <FluentStack Orientation="Orientation.Horizontal" 
-                 HorizontalAlignment="HorizontalAlignment.Start"
-                 VerticalGap="10"
-                 Style="margin-bottom: 20px;">
-        
+    <!-- HEADER: Date Type + Buttons -->
+    <HeaderContent>
         <FluentSelect TOption="string" 
                       @bind-Value="_commonDateType" 
                       Label="Date Type"
@@ -35,109 +32,111 @@
         <FluentSpacer />
 
         <FluentButton Appearance="Appearance.Outline" 
+                      Type="ButtonType.Button"
                       OnClick="AddNewRow"
                       IconStart="@(new Icons.Regular.Size20.Add())">
             Add Row
         </FluentButton>
 
         <FluentButton Appearance="Appearance.Outline" 
+                      Type="ButtonType.Button"
                       Disabled="true"
                       IconStart="@(new Icons.Regular.Size20.ClipboardPaste())">
             Paste
         </FluentButton>
 
         <FluentButton Appearance="Appearance.Outline" 
+                      Type="ButtonType.Button"
                       OnClick="ClearAllAsync"
                       IconStart="@(new Icons.Regular.Size20.Delete())">
             Clear All
         </FluentButton>
-    </FluentStack>
+    </HeaderContent>
 
-    @if (_globalErrors.Any())
-    {
-        <FluentMessageBar Intent="MessageIntent.Error"
-                          Title="Validation Error"
-                          Style="margin-bottom: 20px;">
-            <ul style="margin: 0; padding-left: 20px;">
-                @foreach (var error in _globalErrors)
+    <!-- COLUMN HEADERS -->
+    <ColumnHeaders>
+        <div style="width: 200px;">Purchase Order</div>
+        <div style="width: 100px;">Line</div>
+        <div style="width: 100px;">Seq</div>
+        <div style="width: 200px;">Receipt Date</div>
+        <div style="width: 50px;"></div>
+    </ColumnHeaders>
+
+    <!-- DATA ROWS -->
+    <ChildContent>
+        <!-- Błędy globalne -->
+        @if (_globalErrors.Any())
+        {
+            <FluentMessageBar Intent="MessageIntent.Error" 
+                              Title="Validation Error"
+                              Style="margin-bottom: 10px;">
+                <ul style="margin: 0; padding-left: 20px;">
+                    @foreach (var error in _globalErrors)
+                    {
+                        <li>@error</li>
+                    }
+                </ul>
+            </FluentMessageBar>
+        }
+
+        <!-- Wiersze danych -->
+        @for (int i = 0; i < _rows.Count; i++)
+        {
+            var rowIndex = i;
+            var row = _rows[rowIndex];
+
+            <div style="margin-bottom: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center; padding: 10px; border: 1px solid var(--neutral-stroke-rest); border-radius: 4px;">
+                    
+                    <FluentTextField @bind-Value="row.PurchaseOrderNumber" 
+                                     Placeholder="9 digits"
+                                     Style="width: 200px;" />
+
+                    <FluentNumberField @bind-Value="row.LineNumber" 
+                                       Min="1"
+                                       Style="width: 100px;" />
+
+                    <FluentNumberField @bind-Value="row.Sequence" 
+                                       Min="1"
+                                       Style="width: 100px;" />
+
+                    <FluentDatePicker @bind-Value="row.ReceiptDate"
+                                      Style="width: 200px;" />
+
+                    <FluentButton Appearance="Appearance.Outline" 
+                                  IconStart="@(new Icons.Regular.Size20.Delete())"
+                                  OnClick="() => RemoveRow(rowIndex)"
+                                  Style="width: 40px; height: 32px;" />
+                </div>
+
+                @if (row.Errors.Any())
                 {
-                    <li>@error</li>
+                    <FluentMessageBar Intent="MessageIntent.Error" 
+                                      Style="margin-top: 5px;">
+                        <ul style="margin: 0; padding-left: 20px;">
+                            @foreach (var error in row.Errors)
+                            {
+                                <li>@error</li>
+                            }
+                        </ul>
+                    </FluentMessageBar>
                 }
-            </ul>
-        </FluentMessageBar>
-    }
+            </div>
+        }
+    </ChildContent>
 
-    <!-- SEKCJA 3: Lista wierszy -->
-    @for (int i = 0; i < _rows.Count; i++)
-    {
-        var rowIndex = i;
-        var row = _rows[rowIndex];
-
-        <div style="border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
-            <!-- Nagłówki -->
-            <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="10" Style="align-items: center;">
-                <div style="width: 200px;"><strong>Purchase order:</strong></div>
-                <div style="width: 80px;"><strong>Line:</strong></div>
-                <div style="width: 80px;"><strong>Sequence:</strong></div>
-                <div style="width: 180px;"><strong>@_commonDateType Receipt Date:</strong></div>
-                <div style="width: 200px;"></div> <!-- Kolumna dla przycisku Remove -->
-            </FluentStack>
-
-
-            <FluentStack Orientation="Orientation.Horizontal" VerticalGap="10">
-
-                <FluentTextField @bind-Value="row.PurchaseOrderNumber"
-                                 Placeholder="9 digits"
-                                 Style="width: 150px;" />
-
-                <FluentNumberField @bind-Value="row.LineNumber"
-                                   Min="1"
-                                   Style="width: 100px;" />
-
-                <FluentNumberField @bind-Value="row.Sequence"
-                                   Min="1"
-                                   Style="width: 100px;" />
-
-                <FluentDatePicker @bind-Value="row.ReceiptDate"
-                                  Style="width: 180px;" />
-
-                <FluentButton Appearance="Appearance.Outline"
-                              IconStart="@(new Icons.Regular.Size20.Delete())"
-                              OnClick="() => RemoveRow(rowIndex)"
-                              Style="align-self: flex-end;" />
-
-
-            </FluentStack>
-
-            <!-- Błędy dla tego wiersza -->
-            @if (row.Errors.Any())
-            {
-                <FluentMessageBar Intent="MessageIntent.Error"
-                                  Style="margin-top: 10px;">
-                    <ul style="margin: 0; padding-left: 20px;">
-                        @foreach (var error in row.Errors)
-                        {
-                            <li>@error</li>
-                        }
-                    </ul>
-                </FluentMessageBar>
-            }
-        </div>
-    }
-
-    <!-- SEKCJA 4: Submit Button -->
-    <FluentStack HorizontalAlignment="HorizontalAlignment.End" Style="margin-top: 20px;">
-        <FluentButton Appearance="Appearance.Accent"
+    <!-- FOOTER: Submit Button -->
+    <FooterContent>
+        <FluentButton Appearance="Appearance.Accent" 
                       OnClick="HandleSubmitAsync"
                       Disabled="@_isSubmitting">
             Submit All (@_rows.Count rows)
         </FluentButton>
-    </FluentStack>
+    </FooterContent>
 
-</FluentCard>
+</DataContainer>
 
 <LoadingOverlay IsVisible="@_isSubmitting" Message="Submitting changes..." />
-
 
 
 @code {
