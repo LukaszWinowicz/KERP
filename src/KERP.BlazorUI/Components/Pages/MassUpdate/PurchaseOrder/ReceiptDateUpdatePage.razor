@@ -1,6 +1,7 @@
 ﻿@page "/mass-update/purchase-order/receipt-date"
 @using KERP.Application.Common.Abstractions.CQRS
 @using KERP.Application.Common.Abstractions.MassUpdate.PurchaseOrder.ReceiptDate
+@using KERP.Application.Common.Models
 @using KERP.BlazorUI.Components.Shared
 @using KERP.Domain.Aggregates.MassUpdate.PurchaseOrder
 @using System.ComponentModel.DataAnnotations
@@ -8,112 +9,228 @@
 
 @inject IMediator Mediator
 @inject IToastService ToastService
+@inject IDialogService DialogService
 
 <PageTitle>Mass Update - Receipt Date</PageTitle>
 
-<h3>Update Purchase Order Receipt Date</h3>
-<p>Enter the details below to submit a receipt date change request.</p>
+<h3>Batch Update Purchase Order Receipt Date</h3>
+<p>Add multiple rows and submit all at once.</p>
 
-<FluentCard Style="max-width: 600px; margin-top: 20px;">
-    <EditForm Model="@Model" OnValidSubmit="HandleValidSubmitAsync" FormName="receipt-date-update-form">
-        <DataAnnotationsValidator />
+<FluentCard Style="max-width: 1200px; margin-top: 20px;">
+    
+    <!-- SEKCJA 1: DateType + Przyciski akcji -->
+    <FluentStack Orientation="Orientation.Horizontal" 
+                 HorizontalAlignment="HorizontalAlignment.Start"
+                 VerticalGap="10"
+                 Style="margin-bottom: 20px;">
         
-        <FluentStack Orientation="Orientation.Vertical" Gap="20px">
-            
-            <FluentTextField @bind-Value="Model.PurchaseOrderNumber" Label="Purchase Order Number" Placeholder="Enter 9-digit PO Number" Required="true" />
-            
-            <FluentNumberField @bind-Value="Model.LineNumber" Label="Line Number" Min="1" />
+        <FluentSelect TOption="string" 
+                      @bind-Value="_commonDateType" 
+                      Label="Date Type"
+                      Style="width: 200px;">
+            <FluentOption Value="@nameof(DateType.Confirmed)">Confirmed</FluentOption>
+            <FluentOption Value="@nameof(DateType.Changed)">Changed</FluentOption>
+        </FluentSelect>
 
-            <FluentNumberField @bind-Value="Model.Sequence" Label="Sequence" Min="1" />
+        <FluentSpacer />
 
-            <FluentDatePicker @bind-Value="Model.ReceiptDate" Label="New Receipt Date" Required="true" />
+        <FluentButton Appearance="Appearance.Outline" 
+                      OnClick="AddNewRow"
+                      IconStart="@(new Icons.Regular.Size20.Add())">
+            Add Row
+        </FluentButton>
 
-            <FluentSelect TOption="string" @bind-Value="Model.DateType" Label="Date Type">
-                <FluentOption Value="@(nameof(DateType.Confirmed))">Confirmed</FluentOption>
-                <FluentOption Value="@(nameof(DateType.Changed))">Changed</FluentOption>
-            </FluentSelect>
-            
-            <!-- Nowy blok do wyświetlania błędów z serwera -->
-            @if (_serverErrors.Any())
+        <FluentButton Appearance="Appearance.Outline" 
+                      Disabled="true"
+                      IconStart="@(new Icons.Regular.Size20.ClipboardPaste())">
+            Paste
+        </FluentButton>
+
+        <FluentButton Appearance="Appearance.Outline" 
+                      OnClick="ClearAllAsync"
+                      IconStart="@(new Icons.Regular.Size20.Delete())">
+            Clear All
+        </FluentButton>
+    </FluentStack>
+
+    @if (_globalErrors.Any())
+    {
+        <FluentMessageBar Intent="MessageIntent.Error"
+                          Title="Validation Error"
+                          Style="margin-bottom: 20px;">
+            <ul style="margin: 0; padding-left: 20px;">
+                @foreach (var error in _globalErrors)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        </FluentMessageBar>
+    }
+
+    <!-- SEKCJA 3: Lista wierszy -->
+    @for (int i = 0; i < _rows.Count; i++)
+    {
+        var rowIndex = i;
+        var row = _rows[rowIndex];
+
+        <div style="border: 1px solid #e0e0e0; padding: 15px; margin-bottom: 15px; border-radius: 4px;">
+            <!-- Nagłówki -->
+            <FluentStack Orientation="Orientation.Horizontal" HorizontalGap="10" Style="align-items: center;">
+                <div style="width: 200px;"><strong>Purchase order:</strong></div>
+                <div style="width: 80px;"><strong>Line:</strong></div>
+                <div style="width: 80px;"><strong>Sequence:</strong></div>
+                <div style="width: 180px;"><strong>@_commonDateType Receipt Date:</strong></div>
+                <div style="width: 200px;"></div> <!-- Kolumna dla przycisku Remove -->
+            </FluentStack>
+
+
+            <FluentStack Orientation="Orientation.Horizontal" VerticalGap="10">
+
+                <FluentTextField @bind-Value="row.PurchaseOrderNumber"
+                                 Placeholder="9 digits"
+                                 Style="width: 150px;" />
+
+                <FluentNumberField @bind-Value="row.LineNumber"
+                                   Min="1"
+                                   Style="width: 100px;" />
+
+                <FluentNumberField @bind-Value="row.Sequence"
+                                   Min="1"
+                                   Style="width: 100px;" />
+
+                <FluentDatePicker @bind-Value="row.ReceiptDate"
+                                  Style="width: 180px;" />
+
+                <FluentButton Appearance="Appearance.Outline"
+                              IconStart="@(new Icons.Regular.Size20.Delete())"
+                              OnClick="() => RemoveRow(rowIndex)"
+                              Style="align-self: flex-end;" />
+
+
+            </FluentStack>
+
+            <!-- Błędy dla tego wiersza -->
+            @if (row.Errors.Any())
             {
-                <FluentMessageBar Intent="MessageIntent.Error" Title="Błędy operacji">
-                    <ul>
-                        @foreach (var error in _serverErrors)
+                <FluentMessageBar Intent="MessageIntent.Error"
+                                  Style="margin-top: 10px;">
+                    <ul style="margin: 0; padding-left: 20px;">
+                        @foreach (var error in row.Errors)
                         {
                             <li>@error</li>
                         }
                     </ul>
                 </FluentMessageBar>
             }
+        </div>
+    }
 
-            <FluentButton Type="ButtonType.Submit"
-                          Appearance="Appearance.Accent"
-                          Disabled="@_isSubmitting">
-                Submit Change
-            </FluentButton>
+    <!-- SEKCJA 4: Submit Button -->
+    <FluentStack HorizontalAlignment="HorizontalAlignment.End" Style="margin-top: 20px;">
+        <FluentButton Appearance="Appearance.Accent"
+                      OnClick="HandleSubmitAsync"
+                      Disabled="@_isSubmitting">
+            Submit All (@_rows.Count rows)
+        </FluentButton>
+    </FluentStack>
 
-        </FluentStack>
-
-        <ValidationSummary style="margin-top: 20px;" />
-
-    </EditForm>
 </FluentCard>
 
-<LoadingOverlay IsVisible="@_isSubmitting" 
-                Message="Submitting changes..." 
-                SpinnerSize="128px" />
+<LoadingOverlay IsVisible="@_isSubmitting" Message="Submitting changes..." />
+
+
 
 @code {
-    private ReceiptDateUpdateModel Model { get; set; } = new();
-
-    // Nowa lista do przechowywania błędów zwróconych przez backend
-    private List<string> _serverErrors = new();
+    private string _commonDateType = nameof(DateType.Confirmed);
+    private List<ReceiptDateRowModel> _rows = new();
+    private List<string> _globalErrors = new();
     private bool _isSubmitting = false;
 
     protected override void OnInitialized()
     {
-        // Ustawienie wartości domyślnych dla formularza
-        Model.ReceiptDate = DateTime.Now.AddDays(1);
-        Model.DateType = nameof(DateType.Confirmed);
+        AddNewRow();
+        StateHasChanged();
+
     }
 
-    private async Task HandleValidSubmitAsync()
+    private void AddNewRow()
     {
-        // Czyścimy listę błędów przed każdą próbą wysłania
-        _serverErrors.Clear();
+        _rows.Add(new ReceiptDateRowModel
+        {
+            ReceiptDate = DateTime.Now.AddDays(1),
+            LineNumber = 10,
+            Sequence = 1
+        });
+
+        StateHasChanged();
+    }
+
+    private void RemoveRow(int index)
+    {
+        if (_rows.Count > 1)
+        {
+            _rows.RemoveAt(index);
+        }
+    }
+
+    private async Task ClearAllAsync()
+    {
+        var dialog = await DialogService.ShowConfirmationAsync(
+            "Are you sure you want to clear all rows?",
+            "Clear All",
+            "Yes",
+            "No");
+
+        var result = await dialog.Result;
+
+        if (!result.Cancelled)
+        {
+            _rows.Clear();
+            _globalErrors.Clear();
+            AddNewRow(); // Dodaj jeden pusty wiersz
+        }
+    }
+
+    private async Task HandleSubmitAsync()
+    {
+        _globalErrors.Clear();
+
+        // Czyść błędy ze wszystkich wierszy
+        foreach (var row in _rows)
+        {
+            row.Errors.Clear();
+        }
+
         _isSubmitting = true;
 
         try
         {
-            await Task.Delay(5000);
+            var items = _rows.Select(row => new ReceiptDateUpdateItem(
+                PurchaseOrderNumber: row.PurchaseOrderNumber,
+                LineNumber: row.LineNumber,
+                Sequence: row.Sequence,
+                ReceiptDate: row.ReceiptDate
+            )).ToList();
 
-            var command = new UpdateReceiptDateCommand(
-                Model.PurchaseOrderNumber,
-                Model.LineNumber,
-                Model.Sequence,
-                Model.ReceiptDate.Value, // Model i walidacja zapewniają, że data nie jest null
-                Enum.Parse<DateType>(Model.DateType)
-        );
+            var command = new UpdateReceiptDateBatchCommand(
+                Items: items,
+                DateType: Enum.Parse<DateType>(_commonDateType)
+            );
 
-            // Wysyłamy command przez Mediator - cała logika walidacji i zapisu dzieje się na backendzie
-            var result = await Mediator.SendCommandAsync<UpdateReceiptDateCommand, KERP.Application.Common.Models.Result>(command);
+            var result = await Mediator.SendCommandAsync<UpdateReceiptDateBatchCommand, Result>(command);
 
             if (result.IsSuccess)
             {
-                // Powiadomienie o sukcesie pozostaje jako "toast"
-                ToastService.ShowSuccess("Receipt date update submitted successfully!");
+                ToastService.ShowSuccess($"Successfully submitted {_rows.Count} rows!");
 
-                // Resetujemy model formularza, aby umożliwić dodanie kolejnego wpisu
-                Model = new ReceiptDateUpdateModel
-                {
-                    ReceiptDate = DateTime.Now.AddDays(1),
-                    DateType = nameof(DateType.Confirmed)
-                };
+                // Wyczyść formularz
+                _rows.Clear();
+                AddNewRow();
             }
             else
             {
-                // Zamiast "toasta", wypełniamy listę błędów, która jest wyświetlana na stronie
-                _serverErrors = result.Errors.Select(e => e.Description).ToList();
+                // Parsuj błędy: globalne vs per-row
+                ParseErrors(result.Errors);
             }
         }
         finally
@@ -122,28 +239,41 @@
         }
     }
 
-    /// <summary>
-    /// Klasa modelu używana do bindowania danych w formularzu.
-    /// Zawiera atrybuty walidacji, które są wykorzystywane przez EditForm.
-    /// </summary>
-    public class ReceiptDateUpdateModel
+    private void ParseErrors(IReadOnlyCollection<Error> errors)
     {
-        [Required(ErrorMessage = "Purchase Order Number is required.")]
-        [StringLength(9, MinimumLength = 9, ErrorMessage = "Purchase Order Number must be exactly 9 characters long.")]
+        foreach (var error in errors)
+        {
+            // Regex: "Row[0].PurchaseOrderNumber jest wymagany"
+            // Wyciągamy: rowIndex=0, errorMessage="PurchaseOrderNumber jest wymagany"
+            var match = System.Text.RegularExpressions.Regex.Match(
+                error.Description,
+                @"^Row\[(\d+)\]\.(.+)$");
+
+            if (match.Success)
+            {
+                // Błąd per-row
+                int rowIndex = int.Parse(match.Groups[1].Value);
+                string errorMessage = match.Groups[2].Value; // ← BEZ "Row[0]."
+
+                if (rowIndex < _rows.Count)
+                {
+                    _rows[rowIndex].Errors.Add(errorMessage);
+                }
+            }
+            else
+            {
+                // Błąd globalny
+                _globalErrors.Add(error.Description);
+            }
+        }
+    }
+
+    public class ReceiptDateRowModel
+    {
         public string PurchaseOrderNumber { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Line Number is required.")]
-        [Range(1, int.MaxValue, ErrorMessage = "Line Number must be at least 1.")]
-        public int LineNumber { get; set; } = 1;
-
-        [Required(ErrorMessage = "Sequence is required.")]
-        [Range(1, int.MaxValue, ErrorMessage = "Sequence must be at least 1.")]
-        public int Sequence { get; set; } = 1;
-
-        [Required(ErrorMessage = "Receipt Date is required.")]
+        public int LineNumber { get; set; }
+        public int Sequence { get; set; }
         public DateTime? ReceiptDate { get; set; }
-
-        [Required(ErrorMessage = "Date Type is required.")]
-        public string? DateType { get; set; }
+        public List<string> Errors { get; set; } = new();
     }
 }
